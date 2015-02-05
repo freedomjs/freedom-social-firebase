@@ -1,0 +1,19 @@
+{
+  "manifest_version": 2,
+  "name": "test",
+  "description": "",
+  "version": "0.0.1",
+  "app": {
+    "background": {
+      "scripts": [
+        "background.js"
+      ]
+    }
+  },
+  "permissions": [
+    "https://w8s4rp5pvkl.firebaseio-demo.com/*",
+    "identity",
+    "https://accounts.google.com/*",
+    "https://fmdppkkepalnkeommjadgbhiohihdhii.chromiumapp.org/"
+  ]
+}

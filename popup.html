@@ -1,0 +1,44 @@
+<html>
+  <head>
+    <title>Firebase Chat</title>
+    <script src='firebase.js'></script>
+    <script src='firebase-social-provider.js'></script>
+    <script src='facebook-social-provider.js'></script>
+    <script src='google-social-provider.js'></script>
+    <style>
+      body {
+        -webkit-user-select: all;
+      }
+    </style>
+  </head>
+  <body>
+    <div id='loginInput'>
+      <h2>Login:</h2>
+      <p>
+        Social Network:
+        <select id='socialNetwork'>
+          <option value="facebook">Facebook</option>
+          <option value="google">Google</option>
+        </select>
+      </p>
+      <p>
+        OAuth Token: <input id='oauthToken' type='text'/>
+      </p>
+      <p>
+        Instance ID: <input id='instanceId' value='instanceA' type='text'/>
+      </p>
+      <button id='loginButton'>Login</button>
+    </div>
+    <div id='loggedInControls'>
+      <h2>Send a Message:</h2>
+      <p>
+        ClientId: <input id='toClientId' type='text'/>
+        Message: <input id='message' type='text'/>
+        <button id='sendMessageButton'>Send</button>
+      </p>
+      <h2>Events:</h2><div id='events'></div>
+    </div>
+
+    <script src='popup.js'></script>
+  </body>
+</html>
