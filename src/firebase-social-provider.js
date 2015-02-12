@@ -50,8 +50,6 @@ How to dynamically refresh friends periodically?
 
 What happens if OAuth tokens expire and we are still connected?
 
-Need to fulfill login promise with my own client state
-
 Do we need to emit my own clientState and userProfile?  Should they be included
 in getUserProfiles and getClientStates?
 
@@ -77,10 +75,11 @@ Firebase.INTERNAL.forceWebSockets();
 
 
 var FirebaseSocialProvider = function() {
-  console.log('FirebaseSocialProvider called');
+  console.log('FirebaseSocialProvider called!!');
 }
 
 FirebaseSocialProvider.prototype.login = function(loginOpts) {
+  console.log('login called');
   if (this.loginState_) {
     return Promise.reject('Already logged in');
   } else if (!loginOpts.agent) {
@@ -91,7 +90,7 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
   return new Promise(function(fulfill, reject) {
     var baseRef = new Firebase(this.baseUrl_);
     // TODO: add real core.oauth logic
-    var tokenFromUI = getTokenFromUI();
+    var tokenFromUI = undefined;  //getTokenFromUI();
     var tokenPromise =
         tokenFromUI ? Promise.resolve(tokenFromUI) : this.getOAuthToken();
     tokenPromise.then(function(token) {
@@ -100,25 +99,33 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
         if (error) {
           this.loginState_ = null;
           reject("Login Failed! " + error);
-        } else {
-          console.log("Authenticated successfully with payload:", authData);
-          this.loginState_ = {
-            authData: authData,
-            userProfiles: {},  // map from userId to userProfile
-            clientStates: {},  // map from clientId to clientState
-            agent: loginOpts.agent  // Agent string.  Does not include userId.
-          };
-          this.setPresence_(true);
-          this.loadFriends_().then(function(friends) {
-            console.log('got friends: ', friends);
-            for (var i = 0; i < friends.length; ++i) {
-              this.processFriend_(friends[i]);
-            }
-          }.bind(this)).then(fulfill);  // end of loadFriends
-          // TODO: we need to pass some stuff to fulfill!!!!
-          // TODO: we need to emit our own user profile and maybe client?
-          // TODO: should getUserProfiles and getClientStates return our own info?
+          return;
         }
+
+        console.log("Authenticated successfully with payload:", authData);
+        this.loginState_ = {
+          authData: authData,
+          userProfiles: {},  // map from userId to userProfile
+          clientStates: {},  // map from clientId to clientState
+          agent: loginOpts.agent  // Agent string.  Does not include userId.
+        };
+        this.setPresence_(true);
+        // Fulfill login before starting to load friends.
+        fulfill({
+          userId: this.getUserId_(),
+          clientId: this.getUserId_() + '/' + this.loginState_.agent,
+          status: 'ONLINE',
+          lastUpdated: Date.now(),
+          lastSeen: Date.now()  // TODO: are these dates right?
+        });
+        this.loadFriends_().then(function(friends) {
+          console.log('got friends: ', friends);
+          for (var i = 0; i < friends.length; ++i) {
+            this.processFriend_(friends[i]);
+          }
+        }.bind(this));
+        // TODO: do we need to emit our own user profile and maybe client?
+        // TODO: should getUserProfiles and getClientStates return our own info?
       }.bind(this));  // end of authWithOAuthToken
     }.bind(this));  // end of getOAuthToken
   }.bind(this));  // end of return new Promise
@@ -139,7 +146,9 @@ FirebaseSocialProvider.prototype.getUsers = function() {
 }
 
 FirebaseSocialProvider.prototype.sendMessage = function(toClientId, message) {
+  console.log('sendMessage called');
   if (!this.loginState_.clientStates[toClientId]) {
+    console.error('Could not find client ' + toClientId);
     return Promise.reject('Could not find client ' + toClientId);
   }
 
@@ -152,6 +161,7 @@ FirebaseSocialProvider.prototype.sendMessage = function(toClientId, message) {
       this.baseUrl_ + '/' + this.networkName_ + ':' + toUserId + '/friends/' +
       this.networkName_ + ':' + this.getUserId_() + '/inbox/' + toAgent;
   var friendInboxRef = new Firebase(friendInboxUrl);
+  console.log('sending message to url: ' + friendInboxUrl);
 
   // Send message in the format {fromAgent: message}
   // This format is used so that we can monitor the 'child_added' event
@@ -221,6 +231,7 @@ FirebaseSocialProvider.prototype.processFriend_ = function(friend) {
     url: '', // TODO:
     imageData: '' // TODO:
   };
+  console.log('emitting onUserProfile');
   this.dispatchEvent_('onUserProfile', this.loginState_.userProfiles[friend.id]);
 
   // Get + monitor clients for friend.
@@ -240,6 +251,7 @@ FirebaseSocialProvider.prototype.processFriend_ = function(friend) {
         lastUpdated: Date.now(),
         lastSeen: Date.now()  // TODO: are these dates right?
       };
+      console.log('emitting onClientState');
       this.dispatchEvent_(
           'onClientState', this.loginState_.clientStates[clientId]);
     }.bind(this));
