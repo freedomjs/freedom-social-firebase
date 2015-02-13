@@ -4,7 +4,7 @@
   "app": {
     "script": [
       "firebase-shims.js",
-      "firebase-debug.js",
+      "firebase.js",
       "firebase-social-provider.js",
       "facebook-social-provider.js"
    	]
