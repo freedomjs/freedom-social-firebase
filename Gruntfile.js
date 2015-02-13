@@ -33,7 +33,7 @@ module.exports = function(grunt) {
       },
       freedom: {
         src: [require.resolve('freedom')],
-        dest: 'build/demo/common/',
+        dest: 'build/demo/webapp/',
         flatten: true,
         filter: 'isFile',
         expand: true,
@@ -57,7 +57,7 @@ module.exports = function(grunt) {
         expand: true,
         onlyIf: 'modified'
       },
-      demo: {
+      demoMain: {
         cwd: 'src/demo/',
         src: ['**/**'],
         dest: 'build/demo/',
@@ -73,6 +73,22 @@ module.exports = function(grunt) {
         filter: 'isFile',
         expand: true,
         onlyIf: 'modified'
+      },
+      firefoxDemo: {
+        src: ['build/*.js*', 'build/demo/common/*'],
+        dest: 'build/demo/firefox_addon/',
+        flatten: true,
+        filter: 'isFile',
+        expand: true,
+        onlyIf: 'modified'
+      },
+      webappDemo: {
+        src: ['build/*.js*', 'build/demo/common/*'],
+        dest: 'build/demo/webapp/',
+        flatten: true,
+        filter: 'isFile',
+        expand: true,
+        onlyIf: 'modified'
       }
     },
 
@@ -83,16 +99,32 @@ module.exports = function(grunt) {
       }
     },
 
+    connect: {
+      demo: {
+        options: {
+          port: 8000,
+          keepalive: true,
+          base: ['./', 'build/demo/webapp'],
+          open: 'http://localhost:8000/main.html'
+        }
+      }
+    },
+
     clean: ['build/']
   });
 
   grunt.loadNpmTasks('grunt-contrib-clean');
+  grunt.loadNpmTasks('grunt-contrib-connect');
   grunt.loadNpmTasks('grunt-contrib-copy');
   grunt.loadNpmTasks('grunt-contrib-jshint');
 
   grunt.registerTask('build', [
     'jshint',
     'copy'
+  ]);
+  grunt.registerTask('demo', [
+    'build',
+    'connect'
   ]);
   grunt.registerTask('default', [
     'build'
