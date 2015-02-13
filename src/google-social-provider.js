@@ -21,7 +21,7 @@ GoogleSocialProvider.prototype.getOAuthToken = function() {
     chrome.identity.launchWebAuthFlow({url: oauthUrl, interactive: true},
         function(responseUrl) {
           var token = responseUrl.match(/access_token=([^&]+)/)[1];
-          fulfill(token)
+          fulfill(token);
         });
   });
 };
@@ -59,4 +59,4 @@ GoogleSocialProvider.prototype.loadFriends_ = function() {
     };
     xhr.send();
   }.bind(this));
-}
+};
