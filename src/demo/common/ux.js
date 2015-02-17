@@ -141,7 +141,7 @@ function start(instance) {
 setTimeout(function(port) {
   if (typeof freedom !== 'undefined') {
     freedom('demo.json').then(start);
-  } else if (typeof port !== 'undefined') { // Firefox
+  } else if (typeof port !== 'undefined') { // Firefox browser
     port.emit('test', 'Initializing self.port');
     start(function() {
       return {
@@ -157,9 +157,10 @@ setTimeout(function(port) {
         on: port.on.bind(port)
       };
     });
+  } else if (false) {
+    // TODO Firefox addon case
   } else {
     console.error("Error initializing: cannot detect environment");
   }
 //}.bind({}, self.port);
 }.bind({}, self.port), 10);
-

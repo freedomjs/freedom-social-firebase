@@ -51,7 +51,7 @@ module.exports = function(grunt) {
       freedomForFirefox: {
         cwd: freedomFirefoxPath,
         src: ['freedom-for-firefox.jsm'],
-        dest: 'build/demo/firefox_addon/',
+        dest: 'build/demo/firefox_addon/data/',
         flatten: true,
         filter: 'isFile',
         expand: true,
@@ -76,7 +76,7 @@ module.exports = function(grunt) {
       },
       firefoxDemo: {
         src: ['build/*.js*', 'build/demo/common/*'],
-        dest: 'build/demo/firefox_addon/',
+        dest: 'build/demo/firefox_addon/data/',
         flatten: true,
         filter: 'isFile',
         expand: true,
