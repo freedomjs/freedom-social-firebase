@@ -137,11 +137,10 @@ function start(instance) {
  * to the root freedom.js module
  **/
 
-//window.onload = function (port) {
-setTimeout(function(port) {
+window.onload = function (port) {
   if (typeof freedom !== 'undefined') {
     freedom('demo.json').then(start);
-  } else if (typeof port !== 'undefined') { // Firefox browser
+  } else if (typeof port !== 'undefined') { // Firefox
     port.emit('test', 'Initializing self.port');
     start(function() {
       return {
@@ -157,10 +156,7 @@ setTimeout(function(port) {
         on: port.on.bind(port)
       };
     });
-  } else if (false) {
-    // TODO Firefox addon case
   } else {
     console.error("Error initializing: cannot detect environment");
   }
-//}.bind({}, self.port);
-}.bind({}, self.port), 10);
+}.bind({}, self.port);
