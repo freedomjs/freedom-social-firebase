@@ -1,8 +1,6 @@
 /*
 KNOWN ISSUES:
 
-not in a freedom module
-
 messages aren't deleted after being read
 
 single point of failure
@@ -64,10 +62,9 @@ baseUrl should be passed in to login args
 
 automatically delete data so its safe from dashboard
 
-Firebase should be pulled from npm / bower / etc
-
 */
 
+console.log(WebSocket);
 Firebase.INTERNAL.forceWebSockets();
 
   // TODO: how is it that myInboxForFriendRef also has facebook authentication
