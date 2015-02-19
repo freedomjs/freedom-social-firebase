@@ -38,7 +38,7 @@ FacebookSocialProvider.prototype.loadFriends_ = function() {
     };
     xhr.send();
   }.bind(this));
-}
+};
 
 
 // Register provider when in a module context.

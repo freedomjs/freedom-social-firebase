@@ -1,0 +1,8 @@
+{
+  "name": "freedom-social-firebase",
+  "version": "0.0.0",
+  "dependencies": {
+    "firebase": "~2.2.0"
+  },
+  "devDependencies": {}
+}

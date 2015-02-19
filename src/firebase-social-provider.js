@@ -76,7 +76,7 @@ Firebase.INTERNAL.forceWebSockets();
 
 var FirebaseSocialProvider = function() {
   console.log('FirebaseSocialProvider called!!');
-}
+};
 
 FirebaseSocialProvider.prototype.login = function(loginOpts) {
   console.log('login called');
@@ -90,7 +90,7 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
   return new Promise(function(fulfill, reject) {
     var baseRef = new Firebase(this.baseUrl_);
     // TODO: add real core.oauth logic
-    var tokenFromUI = undefined;  //getTokenFromUI();
+    var tokenFromUI;  //getTokenFromUI();
     var tokenPromise =
         tokenFromUI ? Promise.resolve(tokenFromUI) : this.getOAuthToken();
     tokenPromise.then(function(token) {
@@ -136,14 +136,14 @@ FirebaseSocialProvider.prototype.getClients = function() {
     return Promise.reject('Not logged in');
   }
   return Promise.resolve(this.loginState_.clientStates);
-}
+};
 
 FirebaseSocialProvider.prototype.getUsers = function() {
   if (!this.loginState_) {
     return Promise.reject('Not logged in');
   }
   return Promise.resolve(this.loginState_.userProfiles);
-}
+};
 
 FirebaseSocialProvider.prototype.sendMessage = function(toClientId, message) {
   console.log('sendMessage called');
@@ -170,22 +170,21 @@ FirebaseSocialProvider.prototype.sendMessage = function(toClientId, message) {
   messageObj[this.loginState_.agent] = message;
   friendInboxRef.push(messageObj);
   return Promise.resolve();
-}
+};
 
 FirebaseSocialProvider.prototype.logout = function() {
   this.initState_();
   // TODO: are there any firebase calls to make?
   // We need to disconnect all our firebase refs
   return Promise.resolve();
-}
-
+};
 
 FirebaseSocialProvider.prototype.initState_ = function() {
   // TODO: popping-heat-4874 should be passed in.
   this.baseUrl_ = 'https://popping-heat-4874.firebaseio.com/' +
       this.networkName_ + '-users';
   var loginState_ = null;
-}
+};
 
 // Friend should contain id and name fields
 FirebaseSocialProvider.prototype.processFriend_ = function(friend) {
@@ -255,7 +254,7 @@ FirebaseSocialProvider.prototype.processFriend_ = function(friend) {
       this.dispatchEvent_(
           'onClientState', this.loginState_.clientStates[clientId]);
     }.bind(this));
-  }.bind(this))
+  }.bind(this));
 };
 
 FirebaseSocialProvider.prototype.setPresence_ = function(isOnline) {
@@ -276,7 +275,7 @@ FirebaseSocialProvider.prototype.setPresence_ = function(isOnline) {
 FirebaseSocialProvider.prototype.getClientsUrl_ = function(userId, optAgent) {
   return this.baseUrl_ + '/' + this.networkName_ + ':' + userId + '/clients' +
       (optAgent ? '/' + optAgent : '');
-}
+};
 
 // UserId should not include "facebook:", "google:", etc.
 FirebaseSocialProvider.prototype.getUserId_ = function() {
@@ -284,4 +283,4 @@ FirebaseSocialProvider.prototype.getUserId_ = function() {
     throw 'Error in FirebaseSocialProvider.getUserId_: not logged in';
   }
   return this.loginState_.authData[this.networkName_].id;
-}
+};
