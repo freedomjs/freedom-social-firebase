@@ -122,7 +122,7 @@ module.exports = function(grunt) {
     'jshint',
     'copy'
   ]);
-  grunt.registerTask('demo', [
+  grunt.registerTask('webapp_demo', [
     'build',
     'connect'
   ]);
