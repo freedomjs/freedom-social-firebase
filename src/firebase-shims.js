@@ -30,7 +30,9 @@ if (typeof WebSocket === 'undefined') {
   WebSocket = function(url, protocols) {
     var ws = new freedom['core.websocket'](url, protocols);
     console.log(ws);
-    this.send = ws.send;
+    this.send = function(payload) {
+      ws.send({text:payload});
+    };
     this.close = ws.close;
     ws.on('onOpen', function() {
       if (typeof this.onopen !== 'undefined') {
