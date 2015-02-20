@@ -32,9 +32,26 @@ if (typeof WebSocket === 'undefined') {
     console.log(ws);
     this.send = ws.send;
     this.close = ws.close;
-    ws.on('onOpen', this.onopen);
-    ws.on('onClose', this.onclose);
-    ws.on('onMessage', this.onmessage);
-    ws.on('onError', this.onerror);
+    ws.on('onOpen', function() {
+      if (typeof this.onopen !== 'undefined') {
+        this.onopen();
+      }
+    }.bind(this));
+    ws.on('onClose', function() {
+      if (typeof this.onclose !== 'undefined') {
+        this.onclose();
+      }
+    }.bind(this));
+    ws.on('onMessage', function(m) {
+      if (typeof this.onmessage !== 'undefined') {
+        m.data = m.text;  // Firebase expects .data field
+        this.onmessage(m);
+      }
+    }.bind(this));
+    ws.on('onError', function(e) {
+      if (typeof this.onerror !== 'undefined') {
+        this.onerror(e);
+      }
+    }.bind(this));
   };
 }
