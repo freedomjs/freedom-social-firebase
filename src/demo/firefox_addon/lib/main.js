@@ -1,37 +1,43 @@
-/* jshint moz:true */
+/* globals freedom */
+/* jslint moz:true */
 
-var toggle = require('sdk/ui/button/toggle');
+var buttons = require('sdk/ui/button/action');
+var tabs = require('sdk/tabs');
 var self = require('sdk/self');
-var panels = require('sdk/panel');
 const {Cu} = require('chrome');
 
 Cu.import(self.data.url('freedom-for-firefox.jsm'));
 
-var button = toggle.ToggleButton({
-  id: "firebase-demo",
-  label: "Firebase",
-  icon: {
-    "16": "./demo-256.png",
-    "32": "./demo-256.png",
-    "64": "./demo-256.png"
-  },
-  onChange: handleClick
-});
-
-var panel = panels.Panel({
-  contentURL: self.data.url('main.html'),
-  contentScriptFile: self.data.url('ux.js'),
-  onHide: handleHide
-});
+var chat;
+var displayWorker;
 
 function handleClick(state) {
-  if (state.checked) {
-    panel.show({
-      position: button
+  if (!chat) {
+    freedom(self.data.url('demo.json')).then(function(constructor) {
+      chat = constructor(0);
     });
   }
+
+  tabs.open({
+    url: self.data.url('main.html'),
+    onLoad: function onLoad(tab) {
+      displayWorker = tab.attach({
+        contentScriptFile : [
+          self.data.url('ux.js')
+        ]
+      });
+      require('listen.js').setupListeners(chat, displayWorker);
+    }
+  });
 }
 
-function handleHide() {
-  button.state('window', {checked: false});
-}
+var button = buttons.ActionButton({
+  id: 'firebase-demo',
+  label: 'Firebase demo',
+  icon: {
+    '16': './demo-256.png',
+    '32': './demo-256.png',
+    '64': './demo-256.png'
+  },
+  onClick: handleClick
+});

@@ -13,6 +13,7 @@ var freedomFirefoxPath = path.dirname(require.resolve(
 
 module.exports = function(grunt) {
   grunt.initConfig({
+    // NOTE - some copy commands are written in order, i.e. depend on previous
     copy: {
       dist: {
         src: ['src/*.js*'],
@@ -74,17 +75,17 @@ module.exports = function(grunt) {
         expand: true,
         onlyIf: 'modified'
       },
-      firefoxDemo: {
+      webappDemo: {
         src: ['build/*.js*', 'build/demo/common/*'],
-        dest: 'build/demo/firefox_addon/data/',
+        dest: 'build/demo/webapp/',
         flatten: true,
         filter: 'isFile',
         expand: true,
         onlyIf: 'modified'
       },
-      webappDemo: {
-        src: ['build/*.js*', 'build/demo/common/*'],
-        dest: 'build/demo/webapp/',
+      firefoxDemo: {
+        src: ['build/demo/webapp/*'],
+        dest: 'build/demo/firefox_addon/data/',
         flatten: true,
         filter: 'isFile',
         expand: true,
