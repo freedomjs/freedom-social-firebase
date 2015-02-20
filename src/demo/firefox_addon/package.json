@@ -1,0 +1,9 @@
+{
+  "name": "freedom_social_firebase_firefox_addon",
+  "title": "freedom_social_firebase_firefox_addon",
+  "id": "jid1-MUvPvg5cE1xfGQ",
+  "description": "demo of freedomjs Firebase social provider for Firefox",
+  "author": "",
+  "license": "Apache 2.0",
+  "version": "0.1"
+}

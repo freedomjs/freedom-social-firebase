@@ -13,5 +13,7 @@
   "provides": [
     "social"
   ],
-  "permissions": []
+  "permissions": [
+    "core.websocket"
+  ]
 }

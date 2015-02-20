@@ -24,6 +24,7 @@ var Chat = function (dispatchEvent) {
 };
 
 Chat.prototype.login = function() {
+  console.log('start demo.js login');
   var promise = this.social.login({
     agent: 'chatdemo',
     version: '0.1',
@@ -31,6 +32,7 @@ Chat.prototype.login = function() {
     interactive: true,
     rememberLogin: false
   }).then(function (ret) {
+    console.log('then of demo.js login promise');
     this.myClientState = ret;
     console.log("onLogin", this.myClientState);
     if (ret.status === this.social.STATUS.ONLINE) {
@@ -45,6 +47,7 @@ Chat.prototype.login = function() {
     logger.log("Log In Failed", err);
     this.dispatchEvent("recv-err", err);
   }.bind(this));
+  console.log('returning demo.json promise');
   return promise;
 };
 
