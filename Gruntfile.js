@@ -43,7 +43,7 @@ module.exports = function(grunt) {
       freedomForChrome: {
         cwd: freedomChromePath,
         src: ['freedom-for-chrome.js*'],
-        dest: 'build/demo/chrome_extension/',
+        dest: 'build/demo/chrome_app/',
         flatten: true,
         filter: 'isFile',
         expand: true,
@@ -69,7 +69,7 @@ module.exports = function(grunt) {
       },
       chromeDemo: {
         src: ['build/*.js*', 'build/demo/common/*'],
-        dest: 'build/demo/chrome_extension/',
+        dest: 'build/demo/chrome_app/',
         flatten: true,
         filter: 'isFile',
         expand: true,
