@@ -1,12 +1,12 @@
 {
-  "name": "Facebook Social Provider",
-  "description": "Social provider using Facebook chat protocols",
+  "name": "Google Social Provider",
+  "description": "Social provider using Google chat protocols",
   "app": {
     "script": [
       "firebase-shims.js",
       "firebase.js",
       "firebase-social-provider.js",
-      "facebook-social-provider.js"
+      "google-social-provider.js"
    	]
   },
   "default": "social",

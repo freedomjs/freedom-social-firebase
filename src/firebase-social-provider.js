@@ -8,8 +8,6 @@ single point of failure
 scalability: currently only support ~40 simultaneous connections, not
 sure how much we can scale
 
-doesn't use a real core.oauth provider
-
 need to remove directories/access for users who are no longer friends
 
 brand new users can't detect each other properly (not sure why)
@@ -62,40 +60,50 @@ baseUrl should be passed in to login args
 
 automatically delete data so its safe from dashboard
 
+Document which methods inheriting classes must implement
+
+Facebook authentication doesn't go to any account choser type of page
+and instead may just open and immediately close if they have already logged in
+and permission uProxy.  This is ugly, can we either skip opening this tab
+(XHR and detect the redirect) or display some success info in this tab?
+
+Figure out what happens if I hack my JavaScript to lie about who my friends are?
+That will only open me up to receive messages from them right, and won't give
+me any permission to send to them or view their status?
+
+Our current Firebase app is just a free dev app.  What do we need to do to make
+this official / stable / etc?
+
+What happens if too many users try to connect to Firebase?  Can we make login
+fail, or have the user logged out automatically rather than just failing
+silently?
+
 */
 
-console.log(WebSocket);
+console.log('initializing firebase, WebSocket is ', WebSocket);
 Firebase.INTERNAL.forceWebSockets();
 
   // TODO: how is it that myInboxForFriendRef also has facebook authentication
   // credentials?  Why don't I need to auth it again?
 
 
-var FirebaseSocialProvider = function() {
-  console.log('FirebaseSocialProvider called!!');
-};
+var FirebaseSocialProvider = function() {};
 
 FirebaseSocialProvider.prototype.login = function(loginOpts) {
-  console.log('login called');
   if (this.loginState_) {
     return Promise.reject('Already logged in');
   } else if (!loginOpts.agent) {
     return Promise.reject('loginOpts.agent must be set');
   }
 
-  // TODO: need to pass in token using an OAuthView
-  return new Promise(function(fulfill, reject) {
+  return new Promise(function(fulfillLogin, rejectLogin) {
     var baseRef = new Firebase(this.baseUrl_);
-    // TODO: add real core.oauth logic
-    var tokenFromUI;  //getTokenFromUI();
-    var tokenPromise =
-        tokenFromUI ? Promise.resolve(tokenFromUI) : this.getOAuthToken();
-    tokenPromise.then(function(token) {
+    this.getOAuthToken().then(function(token) {
       baseRef.authWithOAuthToken(this.networkName_, token,
           function(error, authData) {
         if (error) {
           this.loginState_ = null;
-          reject("Login Failed! " + error);
+          rejectLogin("Login Failed! " + error);
           return;
         }
 
@@ -108,7 +116,7 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
         };
         this.setPresence_(true);
         // Fulfill login before starting to load friends.
-        fulfill({
+        fulfillLogin({
           userId: this.getUserId_(),
           clientId: this.getUserId_() + '/' + this.loginState_.agent,
           status: 'ONLINE',

@@ -4,25 +4,55 @@ GoogleSocialProvider = function(dispatchEvent) {
   this.networkName_ = 'google';
   this.initState_();
 };
-// TODO: this seems weird
 GoogleSocialProvider.prototype = new FirebaseSocialProvider();
 
+// TODO: use core.oauth view
 GoogleSocialProvider.prototype.getOAuthToken = function() {
-  // Get google token from chrome.identity.launchWebAuthFlow
-  var oauthUrl = "https://accounts.google.com/o/oauth2/auth?" +
-           "client_id=" + '746567772449-jkm5q5hjqtpq5m9htg9kn0os8qphra4d.apps.googleusercontent.com' +
-           "&scope=" + 'https://www.googleapis.com/auth/plus.login%20https://www.googleapis.com/auth/plus.me%20https://www.googleapis.com/auth/userinfo.email%20https://www.googleapis.com/auth/userinfo.profile' +
-           "&redirect_uri=" + chrome.identity.getRedirectURL() +
-           "&response_type=token";
-  // TODO: why isn't this working?
-  // var url = 'https://accounts.google.com/accountchooser?continue=' +
-  //     encodeURIComponent(oauthUrl);
-  return new Promise(function(fulfill, reject) {
-    chrome.identity.launchWebAuthFlow({url: oauthUrl, interactive: true},
-        function(responseUrl) {
-          var token = responseUrl.match(/access_token=([^&]+)/)[1];
-          fulfill(token);
-        });
+  // // Get google token from chrome.identity.launchWebAuthFlow
+  // var oauthUrl = "https://accounts.google.com/o/oauth2/auth?" +
+  //          "client_id=" + '746567772449-jkm5q5hjqtpq5m9htg9kn0os8qphra4d.apps.googleusercontent.com' +
+  //          "&scope=" + 'https://www.googleapis.com/auth/plus.login%20https://www.googleapis.com/auth/plus.me%20https://www.googleapis.com/auth/userinfo.email%20https://www.googleapis.com/auth/userinfo.profile' +
+  //          "&redirect_uri=" + chrome.identity.getRedirectURL() +
+  //          "&response_type=token";
+  // // TODO: why isn't this working?
+  // // var url = 'https://accounts.google.com/accountchooser?continue=' +
+  // //     encodeURIComponent(oauthUrl);
+  // return new Promise(function(fulfill, reject) {
+  //   chrome.identity.launchWebAuthFlow({url: oauthUrl, interactive: true},
+  //       function(responseUrl) {
+  //         var token = responseUrl.match(/access_token=([^&]+)/)[1];
+  //         fulfill(token);
+  //       });
+  // });
+
+  var OAUTH_REDIRECT_URLS = [
+    "https://fmdppkkepalnkeommjadgbhiohihdhii.chromiumapp.org/",
+    "https://www.uproxy.org/oauth-redirect-uri",
+    "http://freedomjs.org/",
+    'http://localhost:8080/'
+  ];
+  var OAUTH_CLIENT_ID = '746567772449-jkm5q5hjqtpq5m9htg9kn0os8qphra4d.apps.googleusercontent.com';
+  var OAUTH_SCOPE = 'https://www.googleapis.com/auth/plus.login%20https://www.googleapis.com/auth/plus.me%20https://www.googleapis.com/auth/userinfo.email%20https://www.googleapis.com/auth/userinfo.profile';
+
+  var oauth = freedom["core.oauth"]();
+  return oauth.initiateOAuth(OAUTH_REDIRECT_URLS).then(function(stateObj) {
+    console.log('oauth.initiateOAuth successful');
+    var oauthUrl = "https://accounts.google.com/o/oauth2/auth?" +
+        "client_id=" + OAUTH_CLIENT_ID +
+        "&scope=" + OAUTH_SCOPE +
+        "&redirect_uri=" + encodeURIComponent(stateObj.redirect) +
+        "&state=" + encodeURIComponent(stateObj.state) +
+        "&response_type=token";
+    var url = 'https://accounts.google.com/accountchooser?continue=' +
+        encodeURIComponent(oauthUrl);
+    return oauth.launchAuthFlow(url, stateObj);
+  }).then(function(responseUrl) {
+    console.log('launchAuthFlow succeeded: ' + responseUrl);
+    var token = responseUrl.match(/access_token=([^&]+)/)[1];
+    console.log('got token: ' + token);
+    return token;
+  }).catch(function (err) {
+    return Promise.reject('Login error: ' + err.message);
   });
 };
 
@@ -60,3 +90,14 @@ GoogleSocialProvider.prototype.loadFriends_ = function() {
     xhr.send();
   }.bind(this));
 };
+
+
+// Register provider when in a module context.
+if (typeof freedom !== 'undefined') {
+  if (!freedom.social) {
+    freedom().providePromises(GoogleSocialProvider);
+  } else {
+    freedom.social().providePromises(GoogleSocialProvider);
+  }
+}
+
