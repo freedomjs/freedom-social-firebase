@@ -17,7 +17,7 @@ module.exports = function(grunt) {
     copy: {
       dist: {
         src: ['src/*.js*'],
-        dest: 'build/',
+        dest: 'build/dist/',
         flatten: true,
         filter: 'isFile',
         expand: true,
@@ -26,7 +26,7 @@ module.exports = function(grunt) {
       firebase: {
         cwd: 'bower_components/firebase/',
         src: ['firebase.js'],
-        dest: 'build/',
+        dest: 'build/dist/',
         flatten: false,
         filter: 'isFile',
         expand: true,
@@ -68,7 +68,7 @@ module.exports = function(grunt) {
         onlyIf: 'modified'
       },
       chromeDemo: {
-        src: ['build/*.js*', 'build/demo/common/*'],
+        src: ['build/dist/*.js*', 'build/demo/common/*'],
         dest: 'build/demo/chrome_app/',
         flatten: true,
         filter: 'isFile',
@@ -76,7 +76,7 @@ module.exports = function(grunt) {
         onlyIf: 'modified'
       },
       webappDemo: {
-        src: ['build/*.js*', 'build/demo/common/*'],
+        src: ['build/dist/*.js*', 'build/demo/common/*'],
         dest: 'build/demo/webapp/',
         flatten: true,
         filter: 'isFile',
