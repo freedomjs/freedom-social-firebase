@@ -7,12 +7,6 @@ FacebookSocialProvider = function(dispatchEvent) {
 FacebookSocialProvider.prototype = new FirebaseSocialProvider();
 
 FacebookSocialProvider.prototype.getOAuthToken = function() {
-  // TODO: get facebook tokens...
-  // Tokens just need user_friends permission
-  // var EVA = 'CAACTRbmvZCKUBALKaMZCIGH3VGSefD1VEvfbK4rlyTkqKtZAr7WZAlVpzEx1ZA257ThGQ2v7NulxXRzzJrhvhZA9Eh7JQPRu7lQv8RHGUJM8t0WvP2saLmcaUDdGoeVJHxgr8gw1GinsBkuD1RYSHGsabuRgnseZA3ZBDQU4qKhtv2ZB9r94JWkbl';
-  // var DAN = 'CAACTRbmvZCKUBAID6PFGHGkGZCmcrbXRSh491fvIK7CmYRBR92pcqq8UHBpVmTsPQj6gATXeZCEBWZCjjdtZCLe6bmSZBFpGUapg48rQeLbQ0S6dLlvaAwCNPWJYwLQwoZBUyDIoAMd76sxVKCQFwaXqnstXlo1Vhy8CvaUpRmhp9FdL5lASZBn2tjPYqxhXZBm6Y1Wts0TwhVYXMexEOEIWx';
-  // return Promise.resolve(EVA);
-
   var OAUTH_REDIRECT_URLS = [
     "https://fmdppkkepalnkeommjadgbhiohihdhii.chromiumapp.org/",
     "https://www.uproxy.org/oauth-redirect-uri",
@@ -24,7 +18,6 @@ FacebookSocialProvider.prototype.getOAuthToken = function() {
 
   var oauth = freedom["core.oauth"]();
   return oauth.initiateOAuth(OAUTH_REDIRECT_URLS).then(function(stateObj) {
-    console.log('oauth.initiateOAuth successful');
     // TODO: can we force an account chooser so this tab doesn't instantly
     // redirect if they are already logged in?  Or can we try a GET request
     // to see if it gives us a token with no interaction needed?
@@ -36,39 +29,60 @@ FacebookSocialProvider.prototype.getOAuthToken = function() {
                 "&response_type=token";
     return oauth.launchAuthFlow(url, stateObj);
   }).then(function(responseUrl) {
-    console.log('launchAuthFlow succeeded: ' + responseUrl);
-    var token = responseUrl.match(/access_token=([^&]+)/)[1];
-    console.log('got token: ' + token);
-    return token;
+    return responseUrl.match(/access_token=([^&]+)/)[1];
   }).catch(function (err) {
     return Promise.reject('Login error: ' + err.message);
   });
 };
 
 // Returns an array of objects containing name and id.
-FacebookSocialProvider.prototype.loadFriends_ = function() {
-  console.log('in loadFriends_');
+FacebookSocialProvider.prototype.loadUsers_ = function() {
   // TODO: should we periodically check for new friends?  Or just force
   // users to logout then login again to detect new friends?
 
   if (!this.loginState_) {
-    return Promise.reject('Not signed in');
+    throw 'Not signed in';
   }
 
   // TODO: use freedom's core.xhr
-  return new Promise(function(fulfill, reject) {
-    var xhr = new XMLHttpRequest();
-    var url = 'https://graph.facebook.com/v2.1/me/friends?access_token=' +
-        this.loginState_.authData.facebook.accessToken;
-    xhr.open('GET', url);
-    // TODO: error checking
-    xhr.onload = function() {
-      // TODO: handle paging
-      console.log('got friends response: ' + this.response);
-      fulfill(JSON.parse(this.response).data);
-    };
-    xhr.send();
-  }.bind(this));
+  var xhr = new XMLHttpRequest();
+  var url = 'https://graph.facebook.com/v2.1/me/friends?access_token=' +
+      this.loginState_.authData.facebook.accessToken;
+  xhr.open('GET', url);
+  // TODO: error checking
+  var thisSocialProvider = this;
+  xhr.onload = function() {
+    // TODO: handle paging
+    console.log('got friends response: ' + this.response);
+    var users = JSON.parse(this.response).data;
+    for (var i = 0; i < users.length; ++i) {
+      thisSocialProvider.addUserProfile_({
+        id: users[i].id,
+        name: users[i].name
+      });
+      thisSocialProvider.getUserImage_(users[i].id);
+    }
+  };
+  xhr.send();
+};
+
+
+FacebookSocialProvider.prototype.getUserImage_ = function(userId) {
+  // TODO: refactor into 1 shared get request.
+  var xhr = new XMLHttpRequest();
+  var url = 'https://graph.facebook.com/v2.1/' + userId + '/picture' +
+      '?access_token=' + this.loginState_.authData.facebook.accessToken +
+      '&format=json&redirect=false';
+  xhr.open('GET', url);
+  // TODO: error checking
+  var thisSocialProvider = this;
+  xhr.onload = function() {
+    // TODO: handle paging
+    console.log('got user response: ' + this.response);
+    var data = JSON.parse(this.response).data;
+    thisSocialProvider.updateUserProfile_({id: userId, imageData: data.url});
+  };
+  xhr.send();
 };
 
 

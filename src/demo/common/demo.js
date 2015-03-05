@@ -28,7 +28,7 @@ Chat.prototype.login = function() {
   var promise = this.social.login({
     agent: 'chatdemo',
     version: '0.1',
-    url: '',
+    url: 'https://popping-heat-4874.firebaseio.com/',
     interactive: true,
     rememberLogin: false
   }).then(function (ret) {
