@@ -1,6 +1,8 @@
 /*
 KNOWN ISSUES:
 
+Need to get my own name and image
+
 single point of failure
 
 scalability: currently only support ~40 simultaneous connections, not
