@@ -6,7 +6,7 @@ FacebookSocialProvider = function(dispatchEvent) {
 };
 FacebookSocialProvider.prototype = new FirebaseSocialProvider();
 
-FacebookSocialProvider.prototype.getOAuthToken = function() {
+FacebookSocialProvider.prototype.getOAuthToken_ = function() {
   var OAUTH_REDIRECT_URLS = [
     "https://fmdppkkepalnkeommjadgbhiohihdhii.chromiumapp.org/",
     "https://www.uproxy.org/oauth-redirect-uri",
@@ -35,54 +35,77 @@ FacebookSocialProvider.prototype.getOAuthToken = function() {
   });
 };
 
-// Returns an array of objects containing name and id.
 FacebookSocialProvider.prototype.loadUsers_ = function() {
   // TODO: should we periodically check for new friends?  Or just force
   // users to logout then login again to detect new friends?
-
-  if (!this.loginState_) {
-    throw 'Not signed in';
-  }
-
-  // TODO: use freedom's core.xhr
-  var xhr = new XMLHttpRequest();
-  var url = 'https://graph.facebook.com/v2.1/me/friends?access_token=' +
-      this.loginState_.authData.facebook.accessToken;
-  xhr.open('GET', url);
-  // TODO: error checking
-  var thisSocialProvider = this;
-  xhr.onload = function() {
+  this.facebookGet_('me/friends').then(function(resp) {
     // TODO: handle paging
-    console.log('got friends response: ' + this.response);
-    var users = JSON.parse(this.response).data;
+    var users = resp.data;
     for (var i = 0; i < users.length; ++i) {
-      thisSocialProvider.addUserProfile_({
+      this.addUserProfile_({
         id: users[i].id,
         name: users[i].name
       });
-      thisSocialProvider.getUserImage_(users[i].id);
+      this.getUserImage_(users[i].id);
     }
-  };
-  xhr.send();
+  }.bind(this)).catch(function(e) {
+    console.error('loadUsers_ failed', e);
+  });
 };
 
 
 FacebookSocialProvider.prototype.getUserImage_ = function(userId) {
-  // TODO: refactor into 1 shared get request.
+  this.facebookGet_(userId + '/picture').then(function(resp) {
+    this.updateUserProfile_(
+        {id: userId, imageData: resp.data.url});
+  }.bind(this)).catch(function(e) {
+    console.error('failed to get image for userId ' + userId, e);
+  });
+};
+
+
+FacebookSocialProvider.prototype.getMyUserProfile_ = function() {
+  var imageData;
+  var name;
+  var url;
+  var getImagePromise = this.facebookGet_('me/picture').then(function(resp) {
+    imageData = resp.data.url;
+  }).catch(function(e) { console.error('error getting me/picture', e); });
+  var nameAndUrlPromise = this.facebookGet_('me').then(function(resp) {
+    name = resp.name;
+    url = resp.link;
+  }).catch(function(e) { console.error('error getting me', e); });
+
+  return Promise.all([getImagePromise, nameAndUrlPromise]).then(function() {
+    return {
+      userId: this.getUserId_(),
+      name: name,
+      lastUpdated: Date.now(),
+      url: url,
+      imageData: imageData
+    };
+  }.bind(this)).catch(function(e) {
+    console.error('error in getMyUserProfile_', e);
+  });
+};
+
+
+FacebookSocialProvider.prototype.facebookGet_ = function(endPoint) {
+  if (!this.loginState_) {
+    throw 'Not signed in';
+  }
   var xhr = new XMLHttpRequest();
-  var url = 'https://graph.facebook.com/v2.1/' + userId + '/picture' +
+  var url = 'https://graph.facebook.com/v2.1/' + endPoint +
       '?access_token=' + this.loginState_.authData.facebook.accessToken +
       '&format=json&redirect=false';
   xhr.open('GET', url);
-  // TODO: error checking
-  var thisSocialProvider = this;
-  xhr.onload = function() {
-    // TODO: handle paging
-    console.log('got user response: ' + this.response);
-    var data = JSON.parse(this.response).data;
-    thisSocialProvider.updateUserProfile_({id: userId, imageData: data.url});
-  };
-  xhr.send();
+  return new Promise(function(fulfill, reject) {
+    // TODO: error checking
+    xhr.onload = function() {
+      fulfill(JSON.parse(this.response));
+    };
+    xhr.send();
+  });
 };
 
 

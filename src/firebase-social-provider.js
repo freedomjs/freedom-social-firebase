@@ -1,7 +1,10 @@
 /*
 KNOWN ISSUES:
 
-Need to get my own name and image
+My id is not something human readable.  Can we not show it on the uProxy UI:
+- log in notification
+- settings tab
+- we can get email from Firebase at least for G+
 
 single point of failure
 
@@ -9,8 +12,6 @@ scalability: currently only support ~40 simultaneous connections, not
 sure how much we can scale
 
 need to remove directories/access for users who are no longer friends
-
-lacks tests
 
 if a user signs in with the same instance name twice things break
 we should probably either reject the new sign in attempt, or we should
@@ -21,6 +22,7 @@ need to have automatic reconnects in case of failure.
 need to handle proxy starting and stopping (broken internet).  we may need to
 reconnect
 
+LACKING TESTS
 Test all these permission cases (these should have all been tested manually
 but need integration tests to ensure they stay correct):
 - I can't write to users inboxes who aren't my friends
@@ -29,6 +31,9 @@ but need integration tests to ensure they stay correct):
 - I can only write to my own clientStates
 - I can't read another users list of friends (even if they are my friend)
 - I can't read messages sent from one user to another, even for friends
+- I can't see who my friends are friends with
+
+TODO: investigate email option
 
 Need to figure out how many simultaneous connections we can have
 
@@ -42,15 +47,9 @@ What happens if OAuth tokens expire and we are still connected?
 Do we need to emit my own clientState and userProfile?  Should they be included
 in getUserProfiles and getClientStates?
 
-Need to implement logout.
-
 Need to deal with paging for friends list
 
 all demos need to be tested again
-
-automatically delete data so its safe from dashboard
-
-Document which methods inheriting classes must implement
 
 Facebook authentication doesn't go to any account choser type of page
 and instead may just open and immediately close if they have already logged in
@@ -64,6 +63,8 @@ What happens if too many users try to connect to Firebase?  Can we make login
 fail, or have the user logged out automatically rather than just failing
 silently?
 
+Get other clients belonging to myself
+
 */
 
 console.log('initializing firebase, WebSocket is ', WebSocket);
@@ -73,11 +74,21 @@ Firebase.INTERNAL.forceWebSockets();
   // credentials?  Why don't I need to auth it again?
 
 
+/*
+ * Abstract base class for Firebase social providers.  Classes which inherit
+ * from FirebaseSocialProvider must implement following:
+ * - set .name property to be the name of the social network, as recognized
+ *   by Firebase (e.g. "facebook", not "Facebook").
+ * - a getOAuthToken_ method which returns a Promise that fulfills with
+ *   an OAuth token for that network
+ * - a loadUsers_ method, which should load user profiles and invoke
+ *   .addUserProfile_ and .updateUserProfile_ as needed.
+ * - a .getMyUserProfile_ method, which should return a Promise that fulfills
+ *   with the logged in user's profile.
+ */
 var FirebaseSocialProvider = function() {};
 
 FirebaseSocialProvider.prototype.login = function(loginOpts) {
-  console.log('FirebaseSocialProvider.prototype.login called with ' +
-      JSON.stringify(loginOpts));
   if (this.loginState_) {
     return Promise.reject('Already logged in');
   } else if (!loginOpts.agent) {
@@ -87,11 +98,10 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
   }
 
   this.baseUrl_ = loginOpts.url + this.networkName_ + '-users';
-  console.log('this.baseUrl_ is ' + this.baseUrl_);
+  var baseRef = new Firebase(this.baseUrl_);
 
   return new Promise(function(fulfillLogin, rejectLogin) {
-    var baseRef = new Firebase(this.baseUrl_);
-    this.getOAuthToken().then(function(token) {
+    this.getOAuthToken_().then(function(token) {
       baseRef.authWithOAuthToken(this.networkName_, token,
           function(error, authData) {
         if (error) {
@@ -99,15 +109,17 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
           rejectLogin("Login Failed! " + error);
           return;
         }
+        console.log('got authData, ', authData);
 
-        console.log("Authenticated successfully with payload:", authData);
         this.loginState_ = {
           authData: authData,
           userProfiles: {},  // map from userId to userProfile
           clientStates: {},  // map from clientId to clientState
           agent: loginOpts.agent  // Agent string.  Does not include userId.
         };
+
         this.setPresence_(true);
+
         // Fulfill login before starting to load friends.
         fulfillLogin({
           userId: this.getUserId_(),
@@ -116,11 +128,20 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
           lastUpdated: Date.now(),
           lastSeen: Date.now()  // TODO: are these dates right?
         });
+
+        this.getMyUserProfile_().then(function(myUserProfile) {
+          // TODO: add this to this.loginState_.userProfiles[friend.id]?
+          console.log('got myUserProfile ' + JSON.stringify(myUserProfile));
+          this.dispatchEvent_('onUserProfile', myUserProfile);
+        }.bind(this)).catch(function(e) {
+          console.error('error getting my user profile');
+        });
+
         this.loadUsers_();
         // TODO: do we need to emit our own user profile and maybe client?
         // TODO: should getUserProfiles and getClientStates return our own info?
       }.bind(this));  // end of authWithOAuthToken
-    }.bind(this));  // end of getOAuthToken
+    }.bind(this));  // end of getOAuthToken_
   }.bind(this));  // end of return new Promise
 };
 
@@ -169,10 +190,13 @@ FirebaseSocialProvider.prototype.sendMessage = function(toClientId, message) {
 };
 
 FirebaseSocialProvider.prototype.logout = function() {
+  if (!this.loginState_) {
+    // User has already logged out.
+    return Promise.resolve();
+  }
   this.setPresence_(false);
+  Firebase.goOffline();  // disconnect all firebase refs.
   this.initState_();
-  // TODO: are there any firebase calls to make?
-  // We need to disconnect all our firebase refs
   return Promise.resolve();
 };
 

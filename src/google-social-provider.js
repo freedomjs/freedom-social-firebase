@@ -6,7 +6,7 @@ GoogleSocialProvider = function(dispatchEvent) {
 };
 GoogleSocialProvider.prototype = new FirebaseSocialProvider();
 
-GoogleSocialProvider.prototype.getOAuthToken = function() {
+GoogleSocialProvider.prototype.getOAuthToken_ = function() {
   var OAUTH_REDIRECT_URLS = [
     "https://fmdppkkepalnkeommjadgbhiohihdhii.chromiumapp.org/",
     "https://www.uproxy.org/oauth-redirect-uri",
@@ -37,37 +37,56 @@ GoogleSocialProvider.prototype.getOAuthToken = function() {
 GoogleSocialProvider.prototype.loadUsers_ = function() {
   // TODO: should we periodically check for new friends?  Or just force
   // users to logout then login again to detect new friends?
-
-  if (!this.loginState_) {
-    throw 'Not signed in';
-  }
-
-  var xhr = new XMLHttpRequest();
-  // TODO: is it safe to include the API KEY?
-  // TODO: is this the right API to get friends with?
-  var url = 'https://www.googleapis.com/plus/v1/people/me/people/visible?key=AIzaSyA1Q7SiEeUdSJwansl2AUFXLpVdnsXUzYg';
-  xhr.open('GET', url);
-  xhr.setRequestHeader(
-      'Authorization',
-      'Bearer ' + this.loginState_.authData.google.accessToken);
-  var thisSocialProvider = this;
-  xhr.onload = function() {
-    // TODO: handle paging?
-    // TODO: error checking
-    // TODO: this contains an image, use it!!!!
-    console.log('got friends response: ' + this.response);
-    var responseObj = JSON.parse(this.response);
-    for (var i = 0; i < responseObj.items.length; ++i) {
-      var friend = responseObj.items[i];
-      thisSocialProvider.addUserProfile_({
+  this.googleGet_('plus/v1/people/me/people/visible').then(function(resp) {
+    for (var i = 0; i < resp.items.length; ++i) {
+      var friend = resp.items[i];
+      this.addUserProfile_({
         id: friend.id,
         name: friend.displayName,
         imageData: friend.image.url,
         url: friend.url
       });
     }
-  };
-  xhr.send();
+  }.bind(this)).catch(function(e) {
+    console.error('Error loading Google users', e);
+  });
+};
+
+
+GoogleSocialProvider.prototype.getMyUserProfile_ = function() {
+  return this.googleGet_('plus/v1/people/me').then(function(resp) {
+    return {
+      userId: resp.id,
+      name: resp.displayName,
+      lastUpdated: Date.now(),
+      url: resp.url,
+      imageData: resp.image.url
+    };
+  }.bind(this)).catch(function(e) {
+    console.error('Error loading Google users', e);
+  });
+};
+
+
+GoogleSocialProvider.prototype.googleGet_ = function(endPoint) {
+  if (!this.loginState_) {
+    throw 'Not signed in';
+  }
+  var xhr = new XMLHttpRequest();
+  // TODO: is it safe to include the API KEY?
+  var url = 'https://www.googleapis.com/' + endPoint +
+      '?key=AIzaSyA1Q7SiEeUdSJwansl2AUFXLpVdnsXUzYg';
+  xhr.open('GET', url);
+  xhr.setRequestHeader(
+      'Authorization',
+      'Bearer ' + this.loginState_.authData.google.accessToken);
+  return new Promise(function(fulfill, reject) {
+    // TODO: error checking
+    xhr.onload = function() {
+      fulfill(JSON.parse(this.response));
+    };
+    xhr.send();
+  });
 };
 
 
