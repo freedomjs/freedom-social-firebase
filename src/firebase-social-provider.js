@@ -1,12 +1,13 @@
 /*
 KNOWN ISSUES:
 
+In uProxy, login to G+, then logout, then login again won't work
+Same with FB
+
 My id is not something human readable.  Can we not show it on the uProxy UI:
 - log in notification
 - settings tab
 - we can get email from Firebase at least for G+
-
-single point of failure
 
 scalability: currently only support ~40 simultaneous connections, not
 sure how much we can scale
@@ -17,10 +18,16 @@ if a user signs in with the same instance name twice things break
 we should probably either reject the new sign in attempt, or we should
 force sign out the old instance
 
-need to have automatic reconnects in case of failure.
+detect disconnects (pings?)
+
+use "url" in uProxy to help prevent contact spoofing
+  - what happens for XMPP contacts with no G+ page?
+  - update https://github.com/uProxy/uproxy/issues/412
 
 need to handle proxy starting and stopping (broken internet).  we may need to
 reconnect
+
+test that I can't create garbage top level directories, or create a google:xxx directory for someone
 
 LACKING TESTS
 Test all these permission cases (these should have all been tested manually
@@ -33,19 +40,13 @@ but need integration tests to ensure they stay correct):
 - I can't read messages sent from one user to another, even for friends
 - I can't see who my friends are friends with
 
-TODO: investigate email option
+TODO: investigate email authentication in Firebase
 
 Need to figure out how many simultaneous connections we can have
 
-Is it bad to repeatedly create new Firebase objects?  Should we re-use
-the same one over and over using .child(..) to get at the different nodes?
-
-How to dynamically refresh friends periodically?
+How to dynamically refresh friends periodically? (freedom-social-xmpp doesn't do this)
 
 What happens if OAuth tokens expire and we are still connected?
-
-Do we need to emit my own clientState and userProfile?  Should they be included
-in getUserProfiles and getClientStates?
 
 Need to deal with paging for friends list
 
@@ -83,12 +84,12 @@ Firebase.INTERNAL.forceWebSockets();
  *   an OAuth token for that network
  * - a loadUsers_ method, which should load user profiles and invoke
  *   .addUserProfile_ and .updateUserProfile_ as needed.
- * - a .getMyUserProfile_ method, which should return a Promise that fulfills
- *   with the logged in user's profile.
+ * - a .getMyUserProfile_ method, which returns the logged in user's profile.
  */
 var FirebaseSocialProvider = function() {};
 
 FirebaseSocialProvider.prototype.login = function(loginOpts) {
+  console.log('login called, ', loginOpts);
   if (this.loginState_) {
     return Promise.reject('Already logged in');
   } else if (!loginOpts.agent) {
@@ -102,6 +103,7 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
 
   return new Promise(function(fulfillLogin, rejectLogin) {
     this.getOAuthToken_().then(function(token) {
+      console.log('got oauth token: ' + token);
       baseRef.authWithOAuthToken(this.networkName_, token,
           function(error, authData) {
         if (error) {
@@ -120,26 +122,19 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
 
         this.setPresence_(true);
 
-        // Fulfill login before starting to load friends.
-        fulfillLogin({
-          userId: this.getUserId_(),
-          clientId: this.getUserId_() + '/' + this.loginState_.agent,
-          status: 'ONLINE',
-          lastUpdated: Date.now(),
-          lastSeen: Date.now()  // TODO: are these dates right?
-        });
+        // Emits my ClientState.
+        var myClientState = this.addOrUpdateClient_(
+            this.getUserId_(),
+            this.getUserId_() + '/' + this.loginState_.agent,
+            'ONLINE');
 
-        this.getMyUserProfile_().then(function(myUserProfile) {
-          // TODO: add this to this.loginState_.userProfiles[friend.id]?
-          console.log('got myUserProfile ' + JSON.stringify(myUserProfile));
-          this.dispatchEvent_('onUserProfile', myUserProfile);
-        }.bind(this)).catch(function(e) {
-          console.error('error getting my user profile');
-        });
+        // Fulfill login before starting to load friends.
+        fulfillLogin(myClientState);
+
+        // Emits my UserProfile.
+        this.addUserProfile_(this.getMyUserProfile_());
 
         this.loadUsers_();
-        // TODO: do we need to emit our own user profile and maybe client?
-        // TODO: should getUserProfiles and getClientStates return our own info?
       }.bind(this));  // end of authWithOAuthToken
     }.bind(this));  // end of getOAuthToken_
   }.bind(this));  // end of return new Promise
@@ -147,14 +142,14 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
 
 FirebaseSocialProvider.prototype.getClients = function() {
   if (!this.loginState_) {
-    return Promise.reject('Not logged in');
+    return Promise.reject('getClients called when no logged in');
   }
   return Promise.resolve(this.loginState_.clientStates);
 };
 
 FirebaseSocialProvider.prototype.getUsers = function() {
   if (!this.loginState_) {
-    return Promise.reject('Not logged in');
+    return Promise.reject('getUsers called when no logged in');
   }
   return Promise.resolve(this.loginState_.userProfiles);
 };
@@ -195,7 +190,10 @@ FirebaseSocialProvider.prototype.logout = function() {
     return Promise.resolve();
   }
   this.setPresence_(false);
-  Firebase.goOffline();  // disconnect all firebase refs.
+  // TODO: we should disconnect all Firebase ref's here, so that we free up
+  // some of our Firebase quota.  However if we just call Firebase.goOffline(),
+  // additional attempts to login with the same webworker (freedom module)
+  // fail (authWithOAuthToken never returns).
   this.initState_();
   return Promise.resolve();
 };
@@ -208,20 +206,34 @@ FirebaseSocialProvider.prototype.initState_ = function() {
 // Friend should contain id and name fields
 // TODO: rename friend, maybe change args
 FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
-  console.log('addUserProfile_ called, ' + JSON.stringify(friend));
-
-  if (this.loginState_.userProfiles[friend.id]) {
+  if (this.loginState_.userProfiles[friend.userId]) {
     console.warn('addUserProfile called for existing user ', friend);
     return;
   }
 
+  if (friend.userId == this.getUserId_()) {
+    // Add a user profile for ourself and just return.
+    // TODO: monitor for all clients except this one.
+    // TODO: refactor this so we don't have identical userProfile adding
+    // code twice.
+    this.loginState_.userProfiles[friend.userId] = {
+      userId: friend.userId,
+      name: friend.name || '',
+      lastUpdated: Date.now(),
+      url: friend.url || '',
+      imageData: friend.imageData || ''
+    };
+    this.dispatchEvent_(
+        'onUserProfile', this.loginState_.userProfiles[friend.userId]);
+    return;
+  }
 
   // Ensure that a permanent friend object exists, with the users name.
   // This must be present in order for other friends to properly detect our
   // clients, based on the current Firebase rules configuration.
   var myUrlForFriend =
       this.baseUrl_ + '/' + this.networkName_ + ':' + this.getUserId_() +
-      '/friends/' + this.networkName_ + ':' + friend.id;
+      '/friends/' + this.networkName_ + ':' + friend.userId;
   var myRefForFriend = new Firebase(myUrlForFriend);
   myRefForFriend.set({isFriend: true});
 
@@ -237,17 +249,16 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
     value.forEach(function(snapshot) {
       var fromAgent = snapshot.key();
       var message = snapshot.val();
-      var clientId = friend.id + '/' + fromAgent;
+      var clientId = friend.userId + '/' + fromAgent;
       var fromClientState = this.loginState_.clientStates[clientId];
       if (!fromClientState) {
         // We won't have the client yet if the user had never yet signed onto
         // Firebase until after we logged in.  In this case just add a client
         // for them.
-        console.log('Got message with unknown client from: ' + friend.id +
+        console.log('Got message with unknown client from: ' + friend.userId +
             ', key: ' + fromAgent + ', val: ' + message);
-        this.addOrUpdateClient_(friend.id, clientId, 'ONLINE');
-        // TODO: this is ugly.  maybe addOrUpdateClient_ should return the client?
-        fromClientState = this.loginState_.clientStates[clientId];
+        fromClientState =
+            this.addOrUpdateClient_(friend.userId, clientId, 'ONLINE');
       }
       fromClientState.lastSeen = Date.now();
       this.dispatchEvent_(
@@ -257,15 +268,15 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
   }.bind(this));
 
   // Create a userProfile right away.
-  this.loginState_.userProfiles[friend.id] = {
-    userId: friend.id,
-    name: friend.name,
+  this.loginState_.userProfiles[friend.userId] = {
+    userId: friend.userId,
+    name: friend.name || '',
     lastUpdated: Date.now(),
     url: friend.url || '',
     imageData: friend.imageData || ''
   };
   this.dispatchEvent_(
-      'onUserProfile', this.loginState_.userProfiles[friend.id]);
+      'onUserProfile', this.loginState_.userProfiles[friend.userId]);
 
   // Get and monitor clients for friend.
   // Note that if the friend has never yet signed onto Firebase (i.e. their
@@ -273,7 +284,7 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
   // this will never return any clients.  In that case we will only know
   // about a client when they send us the first message (e.g. instance message
   // in the case of uProxy).
-  var clients = new Firebase(this.getClientsUrl_(friend.id));
+  var clients = new Firebase(this.getClientsUrl_(friend.userId));
   clients.on('value', function(value) {
     // TODO: this is going to be updating the lastUpdated and lastSeen values
     // for each client, any time any of the clients change!!!!
@@ -281,36 +292,37 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
     // invoked with A, B, and C..  Find a way to only pay attention to C!!!!
     // TODO: use some combination of child_added and child_changed instead of value
     value.forEach(function(snapshot) {
-      var clientId = friend.id + '/' + snapshot.key();
+      var clientId = friend.userId + '/' + snapshot.key();
       var status = snapshot.val() == 'ONLINE' ? 'ONLINE' : 'OFFLINE';
-      this.addOrUpdateClient_(friend.id, clientId, status);
+      this.addOrUpdateClient_(friend.userId, clientId, status);
     }.bind(this));
   }.bind(this));
 };
 
+// Returns ClientState object.
 FirebaseSocialProvider.prototype.addOrUpdateClient_ =
     function(userId, clientId, status) {
-  console.log('addOrUpdateClient_ clientId ' + clientId + ', with status ' + status);
-  this.loginState_.clientStates[clientId] = {
+  var clientState = {
     userId: userId,
     clientId: clientId,
     status: status,
     lastUpdated: Date.now(),
-    lastSeen: Date.now()  // TODO: are these dates right?
+    lastSeen: Date.now()
   };
-  this.dispatchEvent_(
-      'onClientState', this.loginState_.clientStates[clientId]);
+  this.loginState_.clientStates[clientId] = clientState;
+  this.dispatchEvent_('onClientState', clientState);
+  return clientState;
 };
 
 FirebaseSocialProvider.prototype.updateUserProfile_ = function(newUserProfile) {
-  if (!newUserProfile.id) {
+  if (!newUserProfile.userId) {
     console.error('id missing in updateUserProfile_', newUserProfile);
     return;
-  } else if (!this.loginState_.userProfiles[newUserProfile.id]) {
-    console.error('User profile not found for ' + newUserProfile.id);
+  } else if (!this.loginState_.userProfiles[newUserProfile.userId]) {
+    console.error('User profile not found for ' + newUserProfile.userId);
     return;
   }
-  var profile = this.loginState_.userProfiles[newUserProfile.id];
+  var profile = this.loginState_.userProfiles[newUserProfile.userId];
   profile.name = newUserProfile.name || profile.name;
   profile.url = newUserProfile.url || profile.url;
   profile.imageData = newUserProfile.imageData || profile.imageData;
@@ -325,11 +337,7 @@ FirebaseSocialProvider.prototype.setPresence_ = function(isOnline) {
   // oauth token)?
   var clientRef = new Firebase(
       this.getClientsUrl_(this.getUserId_(), this.loginState_.agent));
-  if (isOnline) {
-    clientRef.set('ONLINE');
-  } else {
-    clientRef.set('OFFLINE');
-  }
+  clientRef.set(isOnline ? 'ONLINE' : 'OFFLINE');
   clientRef.onDisconnect().remove();
 };
 

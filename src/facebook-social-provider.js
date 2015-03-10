@@ -43,7 +43,7 @@ FacebookSocialProvider.prototype.loadUsers_ = function() {
     var users = resp.data;
     for (var i = 0; i < users.length; ++i) {
       this.addUserProfile_({
-        id: users[i].id,
+        userId: users[i].id,
         name: users[i].name
       });
       this.getUserImage_(users[i].id);
@@ -57,7 +57,7 @@ FacebookSocialProvider.prototype.loadUsers_ = function() {
 FacebookSocialProvider.prototype.getUserImage_ = function(userId) {
   this.facebookGet_(userId + '/picture').then(function(resp) {
     this.updateUserProfile_(
-        {id: userId, imageData: resp.data.url});
+        {userId: userId, imageData: resp.data.url});
   }.bind(this)).catch(function(e) {
     console.error('failed to get image for userId ' + userId, e);
   });
@@ -65,28 +65,18 @@ FacebookSocialProvider.prototype.getUserImage_ = function(userId) {
 
 
 FacebookSocialProvider.prototype.getMyUserProfile_ = function() {
-  var imageData;
-  var name;
-  var url;
-  var getImagePromise = this.facebookGet_('me/picture').then(function(resp) {
-    imageData = resp.data.url;
-  }).catch(function(e) { console.error('error getting me/picture', e); });
-  var nameAndUrlPromise = this.facebookGet_('me').then(function(resp) {
-    name = resp.name;
-    url = resp.link;
-  }).catch(function(e) { console.error('error getting me', e); });
-
-  return Promise.all([getImagePromise, nameAndUrlPromise]).then(function() {
-    return {
-      userId: this.getUserId_(),
-      name: name,
-      lastUpdated: Date.now(),
-      url: url,
-      imageData: imageData
-    };
-  }.bind(this)).catch(function(e) {
-    console.error('error in getMyUserProfile_', e);
-  });
+  if (!this.loginState_) {
+    throw 'Error in FacebookSocialProvider.getMyUserProfile_: not logged in';
+  }
+  var cachedUserProfile =
+      this.loginState_.authData[this.networkName_].cachedUserProfile;
+  return {
+    userId: this.getUserId_(),
+    name: cachedUserProfile.name,
+    lastUpdated: Date.now(),
+    url: cachedUserProfile.link,
+    imageData: cachedUserProfile.picture.data.url
+  };
 };
 
 

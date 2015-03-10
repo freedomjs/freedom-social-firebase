@@ -38,10 +38,11 @@ GoogleSocialProvider.prototype.loadUsers_ = function() {
   // TODO: should we periodically check for new friends?  Or just force
   // users to logout then login again to detect new friends?
   this.googleGet_('plus/v1/people/me/people/visible').then(function(resp) {
+    console.log('got my contacts, ' + JSON.stringify(resp));
     for (var i = 0; i < resp.items.length; ++i) {
       var friend = resp.items[i];
       this.addUserProfile_({
-        id: friend.id,
+        userId: friend.id,
         name: friend.displayName,
         imageData: friend.image.url,
         url: friend.url
@@ -54,17 +55,18 @@ GoogleSocialProvider.prototype.loadUsers_ = function() {
 
 
 GoogleSocialProvider.prototype.getMyUserProfile_ = function() {
-  return this.googleGet_('plus/v1/people/me').then(function(resp) {
-    return {
-      userId: resp.id,
-      name: resp.displayName,
-      lastUpdated: Date.now(),
-      url: resp.url,
-      imageData: resp.image.url
-    };
-  }.bind(this)).catch(function(e) {
-    console.error('Error loading Google users', e);
-  });
+  if (!this.loginState_) {
+    throw 'Error in GoogleSocialProvider.getMyUserProfile_: not logged in';
+  }
+  var cachedUserProfile =
+      this.loginState_.authData[this.networkName_].cachedUserProfile;
+  return {
+    userId: this.getUserId_(),
+    name: cachedUserProfile.name,
+    lastUpdated: Date.now(),
+    url: cachedUserProfile.link,
+    imageData: cachedUserProfile.picture + '?sz=50'
+  };
 };
 
 
