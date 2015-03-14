@@ -18,9 +18,6 @@ FacebookSocialProvider.prototype.getOAuthToken_ = function() {
 
   var oauth = freedom["core.oauth"]();
   return oauth.initiateOAuth(OAUTH_REDIRECT_URLS).then(function(stateObj) {
-    // TODO: can we force an account chooser so this tab doesn't instantly
-    // redirect if they are already logged in?  Or can we try a GET request
-    // to see if it gives us a token with no interaction needed?
     var url = "https://www.facebook.com/dialog/oauth?" +
                 "client_id=" + encodeURIComponent(OAUTH_CLIENT_ID) +
                 "&scope=" + encodeURIComponent(OAUTH_SCOPE) +
@@ -36,10 +33,7 @@ FacebookSocialProvider.prototype.getOAuthToken_ = function() {
 };
 
 FacebookSocialProvider.prototype.loadUsers_ = function() {
-  // TODO: should we periodically check for new friends?  Or just force
-  // users to logout then login again to detect new friends?
   this.facebookGet_('me/friends').then(function(resp) {
-    // TODO: handle paging
     var users = resp.data;
     for (var i = 0; i < users.length; ++i) {
       this.addUserProfile_({

@@ -1,78 +1,5 @@
-/*
-KNOWN ISSUES:
-
-In uProxy, login to G+, then logout, then login again won't work
-Same with FB
-
-My id is not something human readable.  Can we not show it on the uProxy UI:
-- log in notification
-- settings tab
-- we can get email from Firebase at least for G+
-
-scalability: currently only support ~40 simultaneous connections, not
-sure how much we can scale
-
-need to remove directories/access for users who are no longer friends
-
-if a user signs in with the same instance name twice things break
-we should probably either reject the new sign in attempt, or we should
-force sign out the old instance
-
-detect disconnects (pings?)
-
-use "url" in uProxy to help prevent contact spoofing
-  - what happens for XMPP contacts with no G+ page?
-  - update https://github.com/uProxy/uproxy/issues/412
-
-need to handle proxy starting and stopping (broken internet).  we may need to
-reconnect
-
-test that I can't create garbage top level directories, or create a google:xxx directory for someone
-
-LACKING TESTS
-Test all these permission cases (these should have all been tested manually
-but need integration tests to ensure they stay correct):
-- I can't write to users inboxes who aren't my friends
-- I can't write to a users inbox meant for another friend
-- I can't see clients of users who aren't my friends
-- I can only write to my own clientStates
-- I can't read another users list of friends (even if they are my friend)
-- I can't read messages sent from one user to another, even for friends
-- I can't see who my friends are friends with
-
-TODO: investigate email authentication in Firebase
-
-Need to figure out how many simultaneous connections we can have
-
-How to dynamically refresh friends periodically? (freedom-social-xmpp doesn't do this)
-
-What happens if OAuth tokens expire and we are still connected?
-
-Need to deal with paging for friends list
-
-all demos need to be tested again
-
-Facebook authentication doesn't go to any account choser type of page
-and instead may just open and immediately close if they have already logged in
-and permission uProxy.  This is ugly, can we either skip opening this tab
-(XHR and detect the redirect) or display some success info in this tab?
-
-Our current Firebase app is just a free dev app.  What do we need to do to make
-this official / stable / etc?
-
-What happens if too many users try to connect to Firebase?  Can we make login
-fail, or have the user logged out automatically rather than just failing
-silently?
-
-Get other clients belonging to myself
-
-*/
-
 console.log('initializing firebase, WebSocket is ', WebSocket);
 Firebase.INTERNAL.forceWebSockets();
-
-  // TODO: how is it that myInboxForFriendRef also has facebook authentication
-  // credentials?  Why don't I need to auth it again?
 
 
 /*
@@ -161,9 +88,6 @@ FirebaseSocialProvider.prototype.sendMessage = function(toClientId, message) {
     return Promise.reject('Could not find client ' + toClientId);
   }
 
-  // TODO: is it possible that someone can write to a friend's inbox, but
-  // outside of the client directory?  How to clean this up?
-
   // TODO: what if there is a permission error on the firebase side?
   // Permission errors can happen if the friend has never actually run uproxy
   // yet (i.e. they don't have their own inbox setup)
@@ -204,7 +128,6 @@ FirebaseSocialProvider.prototype.initState_ = function() {
 };
 
 // Friend should contain id and name fields
-// TODO: rename friend, maybe change args
 FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
   if (this.loginState_.userProfiles[friend.userId]) {
     console.warn('addUserProfile called for existing user ', friend);
@@ -289,8 +212,9 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
     // TODO: this is going to be updating the lastUpdated and lastSeen values
     // for each client, any time any of the clients change!!!!
     // i.e. if there are only 2 clients A and B, then C gets added, this will be
-    // invoked with A, B, and C..  Find a way to only pay attention to C!!!!
-    // TODO: use some combination of child_added and child_changed instead of value
+    // invoked with A, B, and C..  Find a way to only pay attention to C.
+    // possibly using some combination of child_added and child_changed instead
+    // of value.
     value.forEach(function(snapshot) {
       var clientId = friend.userId + '/' + snapshot.key();
       var status = snapshot.val() == 'ONLINE' ? 'ONLINE' : 'OFFLINE';
@@ -331,10 +255,6 @@ FirebaseSocialProvider.prototype.updateUserProfile_ = function(newUserProfile) {
 };
 
 FirebaseSocialProvider.prototype.setPresence_ = function(isOnline) {
-  // TODO: how can I dyanmically reconnect everything on a quick
-  // disconnect??????
-  // Should I just logout then login again hidden to the user (re-using same
-  // oauth token)?
   var clientRef = new Firebase(
       this.getClientsUrl_(this.getUserId_(), this.loginState_.agent));
   clientRef.set(isOnline ? 'ONLINE' : 'OFFLINE');
