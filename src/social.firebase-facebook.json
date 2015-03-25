@@ -1,0 +1,20 @@
+{
+  "name": "Facebook Social Provider",
+  "description": "Social provider using Facebook chat protocols",
+  "app": {
+    "script": [
+      "firebase-shims.js",
+      "firebase.js",
+      "firebase-social-provider.js",
+      "facebook-social-provider.js"
+   	]
+  },
+  "default": "social",
+  "provides": [
+    "social"
+  ],
+  "permissions": [
+    "core.websocket",
+    "core.oauth"
+  ]
+}
