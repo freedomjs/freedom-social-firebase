@@ -46,7 +46,8 @@ FacebookSocialProvider.prototype.loadContacts_ = function() {
     for (var i = 0; i < users.length; ++i) {
       this.addUserProfile_({
         userId: users[i].id,
-        name: users[i].name
+        name: users[i].name,
+        url: 'https://www.facebook.com/' + users[i].id
       });
       this.getUserImage_(users[i].id);
     }
