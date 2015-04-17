@@ -188,13 +188,20 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
   // use update, not set, to preserve existing data
   myRefForFriend.update({isFriend: true});
 
-  // Initialize an inbox, writable only by my friend, and unique to this
+  // Set an inbox, writable only by my friend, and unique to this
   // agent (client).  This should be cleared when I disconnect.
   var myInboxForFriendRef = myRefForFriend.child(
       'inbox/' + this.loginState_.agent);
   myInboxForFriendRef.onDisconnect().remove();
 
-  // Monitor my new inbox.
+  // Monitor my new inbox.  Note that messages may have already been written to
+  // this inbox before this handler is connected if:
+  // 1. I login, and broadcast immediately that I'm ONLINE
+  // 2. My friend sees that, and immediately sends me a message (e.g. uProxy
+  //    instance message) before I've setup my inbox
+  // This doesn't create any problems, as the inbox still gets cleared each
+  // time we disconnect - so we don't need to worry about ancient messages
+  // in the inbox.
   myInboxForFriendRef.on('child_added', function(value) {
     value.forEach(function(snapshot) {
       var fromAgent = snapshot.key();
@@ -292,6 +299,10 @@ FirebaseSocialProvider.prototype.updateUserProfile_ = function(newUserProfile) {
  * Sets the ONLINE/OFFLINE presence for the logged in client.
  */
 FirebaseSocialProvider.prototype.setPresence_ = function(isOnline) {
+  // TODO: may want to consider emptying all inboxes for this agent
+  // here or in logout.  The inboxes will be removed when we disconnect from
+  // Firebase, but we only disconnect when this code is unloaded (e.g. uProxy
+  // app or the browser is closed / restarted).
   var clientRef = new Firebase(
       this.getClientsUrl_(this.getUserId_(), this.loginState_.agent));
   clientRef.set(isOnline ? 'ONLINE' : 'OFFLINE');
