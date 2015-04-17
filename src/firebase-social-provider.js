@@ -185,13 +185,13 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
   var myRefForFriend = new Firebase(
       this.baseUrl_ + '/' + this.networkName_ + ':' + this.getUserId_() +
       '/friends/' + this.networkName_ + ':' + friend.userId);
-  myRefForFriend.set({isFriend: true});
+  // use update, not set, to preserve existing data
+  myRefForFriend.update({isFriend: true});
 
   // Initialize an inbox, writable only by my friend, and unique to this
   // agent (client).  This should be cleared when I disconnect.
   var myInboxForFriendRef = myRefForFriend.child(
       'inbox/' + this.loginState_.agent);
-  myInboxForFriendRef.set('empty');
   myInboxForFriendRef.onDisconnect().remove();
 
   // Monitor my new inbox.
