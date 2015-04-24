@@ -246,8 +246,8 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
   clients.on('child_added', function(snapshot) {
     var clientId = friend.userId + '/' + snapshot.key();
     // Some old versions of uProxy (before 4/24/15) set the status to 'OFFLINE'.
-    // We can assume all clients are ONLINE once those versions of uProxy
-    // are no longer in use.
+    // TODO: change to assume ONLINE when old versions of uProxy are no longer
+    // in use.
     var status = snapshot.val() == 'ONLINE' ? 'ONLINE' : 'OFFLINE';
     this.addOrUpdateClient_(friend.userId, clientId, status);
   }.bind(this));
