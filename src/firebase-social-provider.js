@@ -12,7 +12,10 @@ Firebase.INTERNAL.forceWebSockets();
  *   .addUserProfile_ and .updateUserProfile_ as needed.
  * - a .getMyUserProfile_ method, which returns the logged in user's profile.
  */
-var FirebaseSocialProvider = function() {};
+var FirebaseSocialProvider = function() {
+  // Array of {ref :FirebaseRef, eventType :string, callback :Function} objects.
+  this.onCallbacks_ = [];
+};
 
 /*
  * Initialize this.logger using the module name.
@@ -136,6 +139,14 @@ FirebaseSocialProvider.prototype.logout = function() {
     // User has already logged out.
     return Promise.resolve();
   }
+
+  // Disconnect all callbacks.
+  for (var i = 0; i < this.onCallbacks_.length; ++i) {
+    this.onCallbacks_[i].ref.off(
+        this.onCallbacks_[i].eventType, this.onCallbacks_[i].callback);
+  }
+  this.onCallbacks_ = [];
+
   this.setPresence_(false);
   // TODO: we should disconnect all Firebase ref's here, so that we free up
   // some of our Firebase quota.  However if we just call Firebase.goOffline(),
@@ -202,7 +213,7 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
   // This doesn't create any problems, as the inbox still gets cleared each
   // time we disconnect - so we don't need to worry about ancient messages
   // in the inbox.
-  myInboxForFriendRef.on('child_added', function(value) {
+  this.on_(myInboxForFriendRef, 'child_added', function(value) {
     value.forEach(function(snapshot) {
       var fromAgent = snapshot.key();
       var message = snapshot.val();
@@ -243,19 +254,13 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
   // about a client when they send us the first message (e.g. instance message
   // in the case of uProxy).
   var clients = new Firebase(this.getClientsUrl_(friend.userId));
-  clients.on('value', function(value) {
-    // TODO: this is going to be updating the lastUpdated and lastSeen values
-    // for each client, any time any of the clients change!
-    // i.e. if there are only 2 clients A and B, then C gets added, this will be
-    // invoked with A, B, and C..  Find a way to only pay attention to C.
-    // possibly using some combination of child_added and child_changed instead
-    // of value.
-    // See: https://www.firebase.com/docs/web/api/query/on.html
-    value.forEach(function(snapshot) {
-      var clientId = friend.userId + '/' + snapshot.key();
-      var status = snapshot.val() == 'ONLINE' ? 'ONLINE' : 'OFFLINE';
-      this.addOrUpdateClient_(friend.userId, clientId, status);
-    }.bind(this));
+  this.on_(clients, 'child_added', function(snapshot) {
+    var clientId = friend.userId + '/' + snapshot.key();
+    this.addOrUpdateClient_(friend.userId, clientId, 'ONLINE');
+  }.bind(this));
+  this.on_(clients, 'child_removed', function(snapshot) {
+    var clientId = friend.userId + '/' + snapshot.key();
+    this.addOrUpdateClient_(friend.userId, clientId, 'OFFLINE');
   }.bind(this));
 };
 
@@ -305,8 +310,12 @@ FirebaseSocialProvider.prototype.setPresence_ = function(isOnline) {
   // app or the browser is closed / restarted).
   var clientRef = new Firebase(
       this.getClientsUrl_(this.getUserId_(), this.loginState_.agent));
-  clientRef.set(isOnline ? 'ONLINE' : 'OFFLINE');
-  clientRef.onDisconnect().remove();
+  if (isOnline) {
+    clientRef.set('ONLINE');
+    clientRef.onDisconnect().remove();
+  } else {
+    clientRef.remove();
+  }
 };
 
 /*
@@ -326,4 +335,13 @@ FirebaseSocialProvider.prototype.getUserId_ = function() {
     throw 'Error in FirebaseSocialProvider.getUserId_: not logged in';
   }
   return this.loginState_.authData[this.networkName_].id;
+};
+
+
+/*
+ * Adds an event listener, and remembers it for disconnection on logout.
+ */
+FirebaseSocialProvider.prototype.on_ = function(ref, eventType, callback) {
+  this.onCallbacks_.push({ref: ref, eventType: eventType, callback: callback});
+  ref.on(eventType, callback);
 };
