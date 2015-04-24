@@ -243,19 +243,17 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
   // about a client when they send us the first message (e.g. instance message
   // in the case of uProxy).
   var clients = new Firebase(this.getClientsUrl_(friend.userId));
-  clients.on('value', function(value) {
-    // TODO: this is going to be updating the lastUpdated and lastSeen values
-    // for each client, any time any of the clients change!
-    // i.e. if there are only 2 clients A and B, then C gets added, this will be
-    // invoked with A, B, and C..  Find a way to only pay attention to C.
-    // possibly using some combination of child_added and child_changed instead
-    // of value.
-    // See: https://www.firebase.com/docs/web/api/query/on.html
-    value.forEach(function(snapshot) {
-      var clientId = friend.userId + '/' + snapshot.key();
-      var status = snapshot.val() == 'ONLINE' ? 'ONLINE' : 'OFFLINE';
-      this.addOrUpdateClient_(friend.userId, clientId, status);
-    }.bind(this));
+  clients.on('child_added', function(snapshot) {
+    var clientId = friend.userId + '/' + snapshot.key();
+    // Some old versions of uProxy (before 4/24/15) set the status to 'OFFLINE'.
+    // We can assume all clients are ONLINE once those versions of uProxy
+    // are no longer in use.
+    var status = snapshot.val() == 'ONLINE' ? 'ONLINE' : 'OFFLINE';
+    this.addOrUpdateClient_(friend.userId, clientId, status);
+  }.bind(this));
+  clients.on('child_removed', function(snapshot) {
+    var clientId = friend.userId + '/' + snapshot.key();
+    this.addOrUpdateClient_(friend.userId, clientId, 'OFFLINE');
   }.bind(this));
 };
 
@@ -305,8 +303,12 @@ FirebaseSocialProvider.prototype.setPresence_ = function(isOnline) {
   // app or the browser is closed / restarted).
   var clientRef = new Firebase(
       this.getClientsUrl_(this.getUserId_(), this.loginState_.agent));
-  clientRef.set(isOnline ? 'ONLINE' : 'OFFLINE');
-  clientRef.onDisconnect().remove();
+  if (isOnline) {
+    clientRef.set('ONLINE');
+    clientRef.onDisconnect().remove();
+  } else {
+    clientRef.remove();
+  }
 };
 
 /*
