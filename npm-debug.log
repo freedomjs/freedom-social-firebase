@@ -1,0 +1,100 @@
+0 info it worked if it ends with ok
+1 verbose cli [ 'node', '/usr/local/bin/npm', 'publish' ]
+2 info using npm@2.7.3
+3 info using node@v0.10.25
+4 verbose node symlink /usr/local/bin/node
+5 verbose publish [ '.' ]
+6 silly cache add args [ '.', null ]
+7 verbose cache add spec .
+8 silly cache add parsed spec { raw: '.',
+8 silly cache add   scope: null,
+8 silly cache add   name: null,
+8 silly cache add   rawSpec: '.',
+8 silly cache add   spec: '/Users/dborkan/github/freedom-social-firebase-offline',
+8 silly cache add   type: 'directory' }
+9 verbose addLocalDirectory /Users/dborkan/.npm/freedom-social-firebase/0.0.11/package.tgz not in flight; packing
+10 verbose tar pack [ '/Users/dborkan/.npm/freedom-social-firebase/0.0.11/package.tgz',
+10 verbose tar pack   '/Users/dborkan/github/freedom-social-firebase-offline' ]
+11 verbose tarball /Users/dborkan/.npm/freedom-social-firebase/0.0.11/package.tgz
+12 verbose folder /Users/dborkan/github/freedom-social-firebase-offline
+13 info prepublish freedom-social-firebase@0.0.11
+14 verbose addLocalTarball adding from inside cache /Users/dborkan/.npm/freedom-social-firebase/0.0.11/package.tgz
+15 silly cache afterAdd freedom-social-firebase@0.0.11
+16 verbose afterAdd /Users/dborkan/.npm/freedom-social-firebase/0.0.11/package/package.json not in flight; writing
+17 verbose afterAdd /Users/dborkan/.npm/freedom-social-firebase/0.0.11/package/package.json written
+18 silly publish { name: 'freedom-social-firebase',
+18 silly publish   description: 'Firebase Social Provider for freedomjs',
+18 silly publish   version: '0.0.11',
+18 silly publish   repository:
+18 silly publish    { type: 'git',
+18 silly publish      url: 'https://github.com/freedomjs/freedom-social-firebase.git' },
+18 silly publish   bugs: { url: 'https://github.com/freedomjs/freedom-social-firebase/issues' },
+18 silly publish   homepage: 'https://github.com/freedomjs/freedom-social-firebase',
+18 silly publish   devDependencies:
+18 silly publish    { freedom: '^0.6.21',
+18 silly publish      'freedom-for-chrome': '^0.4.15',
+18 silly publish      'freedom-for-firefox': '^0.6.9',
+18 silly publish      grunt: '^0.4.5',
+18 silly publish      'grunt-contrib-clean': '^0.6.0',
+18 silly publish      'grunt-contrib-connect': '^0.9.0',
+18 silly publish      'grunt-contrib-copy': '^0.8.0',
+18 silly publish      'grunt-contrib-jshint': '^0.11.0' },
+18 silly publish   keywords: [ 'freedom.js', 'social', 'firebase' ],
+18 silly publish   scripts: { test: 'echo "Error: no test specified" && exit 1' },
+18 silly publish   readme: '# freedom-social-firebase\n',
+18 silly publish   readmeFilename: 'README.md',
+18 silly publish   gitHead: '198024602c9bcbf19fe41bbdbedcece0cc855c63',
+18 silly publish   _id: 'freedom-social-firebase@0.0.11',
+18 silly publish   _shasum: 'ea8bd5bf584e2d1b7ba034bd460302f02a619bd2',
+18 silly publish   _from: '.' }
+19 silly mapToRegistry name freedom-social-firebase
+20 silly mapToRegistry using default registry
+21 silly mapToRegistry registry https://registry.npmjs.org/
+22 silly mapToRegistry uri https://registry.npmjs.org/freedom-social-firebase
+23 verbose publish registryBase https://registry.npmjs.org/
+24 silly publish uploading /Users/dborkan/.npm/freedom-social-firebase/0.0.11/package.tgz
+25 verbose request uri https://registry.npmjs.org/freedom-social-firebase
+26 verbose request sending authorization for write operation
+27 info attempt registry request try #1 at 19:22:37
+28 verbose request using bearer token for auth
+29 verbose request id 6cf46ef3201d2e4f
+30 http request PUT https://registry.npmjs.org/freedom-social-firebase
+31 http 403 https://registry.npmjs.org/freedom-social-firebase
+32 verbose headers { date: 'Fri, 24 Apr 2015 23:22:38 GMT',
+32 verbose headers   server: 'Apache',
+32 verbose headers   'content-type': 'application/json',
+32 verbose headers   'cache-control': 'max-age=60',
+32 verbose headers   'content-length': '96',
+32 verbose headers   'accept-ranges': 'bytes',
+32 verbose headers   via: '1.1 varnish',
+32 verbose headers   'x-served-by': 'cache-iad2132-IAD',
+32 verbose headers   'x-cache': 'MISS',
+32 verbose headers   'x-cache-hits': '0',
+32 verbose headers   'x-timer': 'S1429917758.626773,VS0,VE361',
+32 verbose headers   'keep-alive': 'timeout=10, max=50',
+32 verbose headers   connection: 'Keep-Alive' }
+33 verbose request invalidating /Users/dborkan/.npm/registry.npmjs.org/freedom-social-firebase on PUT
+34 error publish Failed PUT 403
+35 verbose stack Error: "You cannot publish over the previously published version 0.0.11." : freedom-social-firebase
+35 verbose stack     at CachingRegistryClient.<anonymous> (/usr/local/lib/node_modules/npm/node_modules/npm-registry-client/lib/request.js:254:14)
+35 verbose stack     at Request._callback (/usr/local/lib/node_modules/npm/node_modules/npm-registry-client/lib/request.js:178:14)
+35 verbose stack     at Request.self.callback (/usr/local/lib/node_modules/npm/node_modules/request/request.js:344:22)
+35 verbose stack     at Request.EventEmitter.emit (events.js:98:17)
+35 verbose stack     at Request.<anonymous> (/usr/local/lib/node_modules/npm/node_modules/request/request.js:1239:14)
+35 verbose stack     at Request.EventEmitter.emit (events.js:117:20)
+35 verbose stack     at IncomingMessage.<anonymous> (/usr/local/lib/node_modules/npm/node_modules/request/request.js:1187:12)
+35 verbose stack     at IncomingMessage.EventEmitter.emit (events.js:117:20)
+35 verbose stack     at _stream_readable.js:920:16
+35 verbose stack     at process._tickCallback (node.js:415:13)
+36 verbose statusCode 403
+37 verbose pkgid freedom-social-firebase
+38 verbose cwd /Users/dborkan/github/freedom-social-firebase-offline
+39 error Darwin 13.4.0
+40 error argv "node" "/usr/local/bin/npm" "publish"
+41 error node v0.10.25
+42 error npm  v2.7.3
+43 error code E403
+44 error "You cannot publish over the previously published version 0.0.11." : freedom-social-firebase
+45 error If you need help, you may report this error at:
+45 error     <https://github.com/npm/npm/issues>
+46 verbose exit [ 1, true ]
