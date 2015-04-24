@@ -13,7 +13,8 @@ Firebase.INTERNAL.forceWebSockets();
  * - a .getMyUserProfile_ method, which returns the logged in user's profile.
  */
 var FirebaseSocialProvider = function() {
-  this.onCallbacks_ = [];  // Array of {ref, eventType, callback} objects.
+  // Array of {ref :FirebaseRef, eventType :string, callback :Function} objects.
+  this.onCallbacks_ = [];
 };
 
 /*
