@@ -65,7 +65,7 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
         };
 
         this.setPresence_(true);
-        this.detectDisconnect_();
+        this.setupDetectDisconnect_();
 
         // Emits my ClientState.
         var myClientState = this.addOrUpdateMyClient_('ONLINE');
@@ -359,9 +359,9 @@ FirebaseSocialProvider.prototype.on_ = function(ref, eventType, callback) {
 };
 
 
-FirebaseSocialProvider.prototype.detectDisconnect_ = function() {
+FirebaseSocialProvider.prototype.setupDetectDisconnect_ = function() {
   if (!this.loginState_) {
-    throw 'Error in FirebaseSocialProvider.detectDisconnect_: not logged in';
+    throw 'FirebaseSocialProvider.setupDetectDisconnect_: not logged in';
   }
   var connectedRef = new Firebase(this.baseUrl_ + '.info/connected');
   this.on_(connectedRef, 'value', function(snapshot) {
