@@ -6,6 +6,10 @@ FacebookSocialProvider = function(dispatchEvent) {
 };
 FacebookSocialProvider.prototype = new FirebaseSocialProvider();
 
+FacebookSocialProvider.prototype.authenticate_ = function(firebaseRef) {
+  return this.oauth_(firebaseRef);
+};
+
 /*
  * Returns a Promise which fulfills with an OAuth token.
  */

@@ -6,6 +6,10 @@ GoogleSocialProvider = function(dispatchEvent) {
 };
 GoogleSocialProvider.prototype = new FirebaseSocialProvider();
 
+GoogleSocialProvider.prototype.authenticate_ = function(firebaseRef) {
+  return this.oauth_(firebaseRef);
+};
+
 /*
  * Returns a Promise which fulfills with an OAuth token.
  */

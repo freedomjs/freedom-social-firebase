@@ -6,8 +6,8 @@ Firebase.INTERNAL.forceWebSockets();
  * from FirebaseSocialProvider must implement following:
  * - set .name property to be the name of the social network, as recognized
  *   by Firebase (e.g. "facebook", not "Facebook").
- * - a getOAuthToken_ method which returns a Promise that fulfills with
- *   an OAuth token for that network
+ * - an authenticate method which returns a Promise that fulfills with
+ *   a Firebase authData object.
  * - a loadContacts_ method, which should load user profiles and invoke
  *   .addUserProfile_ and .updateUserProfile_ as needed.
  * - a .getMyUserProfile_ method, which returns the logged in user's profile.
@@ -48,37 +48,31 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
   var allUsersRef = new Firebase(this.allUsersUrl_);
 
   return new Promise(function(fulfillLogin, rejectLogin) {
-    this.getOAuthToken_().then(function(token) {
-      allUsersRef.authWithOAuthToken(this.networkName_, token,
-          function(error, authData) {
-        if (error) {
-          this.initState_();
-          rejectLogin("Login Failed! " + error);
-          return;
-        }
+    this.authenticate_(allUsersRef).then(function(authData) {
+      this.loginState_ = {
+        authData: authData,
+        userProfiles: {},  // map from userId to userProfile
+        clientStates: {},  // map from clientId to clientState
+        agent: loginOpts.agent  // Agent string.  Does not include userId.
+      };
 
-        this.loginState_ = {
-          authData: authData,
-          userProfiles: {},  // map from userId to userProfile
-          clientStates: {},  // map from clientId to clientState
-          agent: loginOpts.agent  // Agent string.  Does not include userId.
-        };
+      this.setPresence_(true);
+      this.setupDetectDisconnect_();
 
-        this.setPresence_(true);
-        this.setupDetectDisconnect_();
+      // Emits my ClientState.
+      var myClientState = this.addOrUpdateMyClient_('ONLINE');
 
-        // Emits my ClientState.
-        var myClientState = this.addOrUpdateMyClient_('ONLINE');
+      // Fulfill login before starting to load friends.
+      fulfillLogin(myClientState);
 
-        // Fulfill login before starting to load friends.
-        fulfillLogin(myClientState);
+      // Emits my UserProfile.
+      this.addUserProfile_(this.getMyUserProfile_());
 
-        // Emits my UserProfile.
-        this.addUserProfile_(this.getMyUserProfile_());
-
-        this.loadContacts_();
-      }.bind(this));  // end of authWithOAuthToken
-    }.bind(this));  // end of getOAuthToken_
+      this.loadContacts_();
+    }.bind(this)).catch(function(err) {
+      this.initState_();
+      rejectLogin("Login Failed! " + err);
+    }.bind(this));  // end of authenticate_
   }.bind(this));  // end of return new Promise
 };
 
@@ -369,5 +363,25 @@ FirebaseSocialProvider.prototype.setupDetectDisconnect_ = function() {
       this.logger.log('Detected disconnect from Firebase');
       this.logout();
     }
+  }.bind(this));
+};
+
+// Default authenticate, used by Facebook and Google.  May be overriden
+// for networks which don't use getOAuthToken, e.g. email.
+FirebaseSocialProvider.prototype.oauth_ = function(firebaseRef) {
+  if (this.loginState_) {
+    throw 'Already signed in';
+  }
+  return new Promise(function(fulfillOAuth, rejectOAuth) {
+    this.getOAuthToken_().then(function(token) {
+      firebaseRef.authWithOAuthToken(this.networkName_, token,
+          function(error, authData) {
+        if (error) {
+          return rejectOAuth(new Error('OAuth failed ' + error));
+        } else {
+          return fulfillOAuth(authData);
+        }
+      }.bind(this));
+    }.bind(this));
   }.bind(this));
 };
