@@ -43,12 +43,13 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
     return Promise.reject('loginOpts.url must be set');
   }
 
-  this.baseUrl_ = loginOpts.url + this.networkName_ + '-users';
-  var baseRef = new Firebase(this.baseUrl_);
+  this.baseUrl_ = loginOpts.url;
+  this.allUsersUrl_ = loginOpts.url + this.networkName_ + '-users';
+  var allUsersRef = new Firebase(this.allUsersUrl_);
 
   return new Promise(function(fulfillLogin, rejectLogin) {
     this.getOAuthToken_().then(function(token) {
-      baseRef.authWithOAuthToken(this.networkName_, token,
+      allUsersRef.authWithOAuthToken(this.networkName_, token,
           function(error, authData) {
         if (error) {
           this.initState_();
@@ -64,12 +65,10 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
         };
 
         this.setPresence_(true);
+        this.detectDisconnect_();
 
         // Emits my ClientState.
-        var myClientState = this.addOrUpdateClient_(
-            this.getUserId_(),
-            this.getUserId_() + '/' + this.loginState_.agent,
-            'ONLINE');
+        var myClientState = this.addOrUpdateMyClient_('ONLINE');
 
         // Fulfill login before starting to load friends.
         fulfillLogin(myClientState);
@@ -118,8 +117,9 @@ FirebaseSocialProvider.prototype.sendMessage = function(toClientId, message) {
   var toUserId = toClientId.substr(0, toClientId.indexOf('/'));
   var toAgent = toClientId.substr(toClientId.indexOf('/'));
   var friendInboxUrl =
-      this.baseUrl_ + '/' + this.networkName_ + ':' + toUserId + '/friends/' +
-      this.networkName_ + ':' + this.getUserId_() + '/inbox/' + toAgent;
+      this.allUsersUrl_ + '/' + this.networkName_ + ':' + toUserId +
+      '/friends/' + this.networkName_ + ':' + this.getUserId_() +
+      '/inbox/' + toAgent;
   var friendInboxRef = new Firebase(friendInboxUrl);
 
   // Send message in the format {fromAgent: message}
@@ -139,6 +139,8 @@ FirebaseSocialProvider.prototype.logout = function() {
     // User has already logged out.
     return Promise.resolve();
   }
+
+  this.addOrUpdateMyClient_('OFFLINE');
 
   // Disconnect all callbacks.
   for (var i = 0; i < this.onCallbacks_.length; ++i) {
@@ -161,6 +163,7 @@ FirebaseSocialProvider.prototype.logout = function() {
  */
 FirebaseSocialProvider.prototype.initState_ = function() {
   this.baseUrl_ = null;
+  this.allUsersUrl_ = null;
   this.loginState_ = null;
 };
 
@@ -194,7 +197,7 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
   // This must be present in order for other friends to properly detect our
   // clients, based on the current Firebase rules configuration.
   var myRefForFriend = new Firebase(
-      this.baseUrl_ + '/' + this.networkName_ + ':' + this.getUserId_() +
+      this.allUsersUrl_ + '/' + this.networkName_ + ':' + this.getUserId_() +
       '/friends/' + this.networkName_ + ':' + friend.userId);
   // use update, not set, to preserve existing data
   myRefForFriend.update({isFriend: true});
@@ -269,6 +272,9 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
  */
 FirebaseSocialProvider.prototype.addOrUpdateClient_ =
     function(userId, clientId, status) {
+  if (!this.loginState_) {
+    throw 'Error in FirebaseSocialProvider.addOrUpdateClient_: not logged in';
+  }
   var clientState = {
     userId: userId,
     clientId: clientId,
@@ -279,6 +285,12 @@ FirebaseSocialProvider.prototype.addOrUpdateClient_ =
   this.loginState_.clientStates[clientId] = clientState;
   this.dispatchEvent_('onClientState', clientState);
   return clientState;
+};
+
+FirebaseSocialProvider.prototype.addOrUpdateMyClient_ = function(status) {
+  var userId = this.getUserId_();
+  var clientId = userId + '/' + this.loginState_.agent;
+  return this.addOrUpdateClient_(userId, clientId, status);
 };
 
 /*
@@ -322,8 +334,8 @@ FirebaseSocialProvider.prototype.setPresence_ = function(isOnline) {
  * Returns the URL where the clients are listed for userId.
  */
 FirebaseSocialProvider.prototype.getClientsUrl_ = function(userId, optAgent) {
-  return this.baseUrl_ + '/' + this.networkName_ + ':' + userId + '/clients' +
-      (optAgent ? '/' + optAgent : '');
+  return this.allUsersUrl_ + '/' + this.networkName_ + ':' + userId +
+      '/clients' + (optAgent ? '/' + optAgent : '');
 };
 
 /*
@@ -344,4 +356,18 @@ FirebaseSocialProvider.prototype.getUserId_ = function() {
 FirebaseSocialProvider.prototype.on_ = function(ref, eventType, callback) {
   this.onCallbacks_.push({ref: ref, eventType: eventType, callback: callback});
   ref.on(eventType, callback);
+};
+
+
+FirebaseSocialProvider.prototype.detectDisconnect_ = function() {
+  if (!this.loginState_) {
+    throw 'Error in FirebaseSocialProvider.detectDisconnect_: not logged in';
+  }
+  var connectedRef = new Firebase(this.baseUrl_ + '.info/connected');
+  this.on_(connectedRef, 'value', function(snapshot) {
+    if (!snapshot.val()) {
+      this.logger.log('Detected disconnect from Firebase');
+      this.logout();
+    }
+  }.bind(this));
 };
