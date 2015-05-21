@@ -233,22 +233,25 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
   this.dispatchEvent_(
       'onUserProfile', this.loginState_.userProfiles[friend.userId]);
 
-  // Get and monitor clients for friend.
+  // Get and monitor clients for the user.
   // Note that if the friend has never yet signed onto Firebase (i.e. their
   // folder at the directory returned by getClientsUrl_ doesn't exist yet)
   // this will never return any clients.  In that case we will only know
   // about a client when they send us the first message (e.g. instance message
   // in the case of uProxy).
+  // This will skip over clients that match the logged in clientId (allowing
+  // us to emit onClientState for other clients for the same user but not
+  // redundantly for this client).
   var clients = new Firebase(this.getClientsUrl_(friend.userId));
   this.on_(clients, 'child_added', function(snapshot) {
     var clientId = friend.userId + '/' + snapshot.key();
-    if (clientId != this.getClientId_()) {
+    if (clientId !== this.getClientId_()) {
       this.addOrUpdateClient_(friend.userId, clientId, 'ONLINE');
     }
   }.bind(this));
   this.on_(clients, 'child_removed', function(snapshot) {
     var clientId = friend.userId + '/' + snapshot.key();
-    if (clientId != this.getClientId_()) {
+    if (clientId !== this.getClientId_()) {
       this.addOrUpdateClient_(friend.userId, clientId, 'OFFLINE');
     }
   }.bind(this));
