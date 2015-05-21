@@ -176,23 +176,6 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
     return;
   }
 
-  if (friend.userId == this.getUserId_()) {
-    // Add a user profile for ourself and just return.
-    // TODO: monitor for all clients except this one.
-    // TODO: refactor this so we don't have identical userProfile adding
-    // code twice.
-    this.loginState_.userProfiles[friend.userId] = {
-      userId: friend.userId,
-      name: friend.name || '',
-      lastUpdated: Date.now(),
-      url: friend.url || '',
-      imageData: friend.imageData || ''
-    };
-    this.dispatchEvent_(
-        'onUserProfile', this.loginState_.userProfiles[friend.userId]);
-    return;
-  }
-
   // Ensure that a permanent friend object exists, with the users name.
   // This must be present in order for other friends to properly detect our
   // clients, based on the current Firebase rules configuration.
@@ -250,20 +233,27 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
   this.dispatchEvent_(
       'onUserProfile', this.loginState_.userProfiles[friend.userId]);
 
-  // Get and monitor clients for friend.
+  // Get and monitor clients for the user.
   // Note that if the friend has never yet signed onto Firebase (i.e. their
   // folder at the directory returned by getClientsUrl_ doesn't exist yet)
   // this will never return any clients.  In that case we will only know
   // about a client when they send us the first message (e.g. instance message
   // in the case of uProxy).
+  // This will skip over clients that match the logged in clientId (allowing
+  // us to emit onClientState for other clients for the same user but not
+  // redundantly for this client).
   var clients = new Firebase(this.getClientsUrl_(friend.userId));
   this.on_(clients, 'child_added', function(snapshot) {
     var clientId = friend.userId + '/' + snapshot.key();
-    this.addOrUpdateClient_(friend.userId, clientId, 'ONLINE');
+    if (clientId !== this.getClientId_()) {
+      this.addOrUpdateClient_(friend.userId, clientId, 'ONLINE');
+    }
   }.bind(this));
   this.on_(clients, 'child_removed', function(snapshot) {
     var clientId = friend.userId + '/' + snapshot.key();
-    this.addOrUpdateClient_(friend.userId, clientId, 'OFFLINE');
+    if (clientId !== this.getClientId_()) {
+      this.addOrUpdateClient_(friend.userId, clientId, 'OFFLINE');
+    }
   }.bind(this));
 };
 
@@ -288,9 +278,8 @@ FirebaseSocialProvider.prototype.addOrUpdateClient_ =
 };
 
 FirebaseSocialProvider.prototype.addOrUpdateMyClient_ = function(status) {
-  var userId = this.getUserId_();
-  var clientId = userId + '/' + this.loginState_.agent;
-  return this.addOrUpdateClient_(userId, clientId, status);
+  return this.addOrUpdateClient_(
+      this.getUserId_(), this.getClientId_(), status);
 };
 
 /*
@@ -347,6 +336,16 @@ FirebaseSocialProvider.prototype.getUserId_ = function() {
     throw 'Error in FirebaseSocialProvider.getUserId_: not logged in';
   }
   return this.loginState_.authData[this.networkName_].id;
+};
+
+/*
+ * Returns the clientId for the logged in user.
+ */
+FirebaseSocialProvider.prototype.getClientId_ = function() {
+  if (!this.loginState_) {
+    throw 'Error in FirebaseSocialProvider.getUserId_: not logged in';
+  }
+  return this.getUserId_() + '/' + this.loginState_.agent;
 };
 
 
