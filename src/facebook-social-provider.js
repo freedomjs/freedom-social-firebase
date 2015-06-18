@@ -11,8 +11,8 @@ FacebookSocialProvider.prototype = new FirebaseSocialProvider();
  */
 FacebookSocialProvider.prototype.getOAuthToken_ = function() {
   var OAUTH_REDIRECT_URLS = [
-    "https://fmdppkkepalnkeommjadgbhiohihdhii.chromiumapp.org/",
     "https://www.uproxy.org/oauth-redirect-uri",
+    "https://fmdppkkepalnkeommjadgbhiohihdhii.chromiumapp.org/",
     "http://freedomjs.org/",
     'http://localhost:8080/'
   ];
