@@ -15,6 +15,7 @@
   ],
   "permissions": [
     "core.websocket",
-    "core.oauth"
+    "core.oauth",
+    "core.storage"
   ]
 }

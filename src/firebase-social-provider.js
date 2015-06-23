@@ -15,6 +15,8 @@ Firebase.INTERNAL.forceWebSockets();
 var FirebaseSocialProvider = function() {
   // Array of {ref :FirebaseRef, eventType :string, callback :Function} objects.
   this.onCallbacks_ = [];
+
+  this.storage = freedom['core.storage']();
 };
 
 /*
@@ -48,7 +50,7 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
   var allUsersRef = new Firebase(this.allUsersUrl_);
 
   return new Promise(function(fulfillLogin, rejectLogin) {
-    this.getOAuthToken_().then(function(token) {
+    this.getOAuthToken_(loginOpts).then(function(token) {
       allUsersRef.authWithOAuthToken(this.networkName_, token,
           function(error, authData) {
         if (error) {

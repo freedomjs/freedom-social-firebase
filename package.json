@@ -1,7 +1,7 @@
 {
   "name": "freedom-social-firebase",
   "description": "Firebase Social Provider for freedomjs",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "repository": {
     "type": "git",
     "url": "https://github.com/freedomjs/freedom-social-firebase.git"
