@@ -51,7 +51,7 @@ FacebookSocialProvider.prototype.getOAuthTokenInteractive_ =
                 "&redirect_uri=" + encodeURIComponent(stateObj.redirect) +
                 "&state=" + encodeURIComponent(stateObj.state) +
                 "&response_type=token";
-    return oauth.launchAuthFlow(url, stateObj);
+    return oauth.launchAuthFlow(url, stateObj, loginOpts.interactive);
   }).then(function(responseUrl) {
     var accessToken = responseUrl.match(/access_token=([^&]+)/)[1];
     if (loginOpts.rememberLogin) {
