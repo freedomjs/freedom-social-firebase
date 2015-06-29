@@ -67,21 +67,40 @@ FacebookSocialProvider.prototype.getOAuthTokenInteractive_ =
  * Loads contacts of the logged in user, and calls this.addUserProfile_
  * and this.updateUserProfile_ (if needed later, e.g. for async image
  * fetching) for each contact.
+ * This method is called recursively to load each page of contacts.
  */
-FacebookSocialProvider.prototype.loadContacts_ = function() {
-  this.facebookGet_('me/friends').then(function(resp) {
-    var users = resp.data;
+FacebookSocialProvider.prototype.loadContacts_ = function(url) {
+  if (!this.loginState_) {
+    throw 'Error in FacebookSocialProvider.loadContacts_: not logged in';
+  }
+
+  var LIMIT = 100;
+  if (!url) {
+    url = 'https://graph.facebook.com/v2.1/me/friends' +
+      '?access_token=' + this.loginState_.authData.facebook.accessToken +
+      '&format=json&redirect=false&limit=' + LIMIT;
+  }
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', url);
+  var thisFacebookSocialProvider = this;
+  xhr.onload = function() {
+    var responseObj = JSON.parse(this.response);
+    var users = responseObj.data;
     for (var i = 0; i < users.length; ++i) {
-      this.addUserProfile_({
+      thisFacebookSocialProvider.addUserProfile_({
         userId: users[i].id,
         name: users[i].name,
         url: 'https://www.facebook.com/' + users[i].id
       });
-      this.getUserImage_(users[i].id);
+      thisFacebookSocialProvider.getUserImage_(users[i].id);
     }
-  }.bind(this)).catch(function(e) {
-    this.logger.error('loadContacts_ failed', e);
-  }.bind(this));
+    if (users.length === LIMIT &&
+        responseObj.paging && responseObj.paging.next) {
+      // Check for more users.
+      thisFacebookSocialProvider.loadContacts_(responseObj.paging.next);
+    }
+  };
+  xhr.send();
 };
 
 /*
