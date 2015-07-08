@@ -80,6 +80,8 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
 
         this.loadContacts_();
       }.bind(this));  // end of authWithOAuthToken
+    }.bind(this)).catch(function(error) {
+      rejectLogin("Login failed");
     }.bind(this));  // end of getOAuthToken_
   }.bind(this));  // end of return new Promise
 };

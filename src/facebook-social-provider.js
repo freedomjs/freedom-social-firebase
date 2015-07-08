@@ -59,7 +59,7 @@ FacebookSocialProvider.prototype.getOAuthTokenInteractive_ =
     }
     return accessToken;
   }.bind(this)).catch(function (err) {
-    return Promise.reject('Login error: ' + err.message);
+    return Promise.reject('Login error: ' + err);
   });
 };
 
