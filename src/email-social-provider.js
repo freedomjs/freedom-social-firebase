@@ -1,33 +1,47 @@
 EmailSocialProvider = function(dispatchEvent) {
   this.dispatchEvent_ = dispatchEvent;
-  // 'password' is the name recognized by Firebase, not 'email'
-  this.networkName_ = 'password';
+  // 'simplelogin' is the name recognized by Firebase, not 'email'
+  this.networkName_ = 'simplelogin';
   this.initLogger_('EmailSocialProvider');
   this.initState_();
 };
 EmailSocialProvider.prototype = new FirebaseSocialProvider();
 
 EmailSocialProvider.prototype.authenticate_ = function(firebaseRef) {
-  firebaseRef.createUser({
-    email: "dborkan@gmail.com",
-    password: "horseRocket"
-  }, function(error, userData) {
-    if (error) {
-      switch (error.code) {
-        case "EMAIL_TAKEN":
-          console.log("The new user account cannot be created because the email is already in use.");
-          break;
-        case "INVALID_EMAIL":
-          console.log("The specified email is not a valid email.");
-          break;
-        default:
-          console.log("Error creating user:", error);
+  return new Promise(function(fulfillAuth, rejectAuth) {
+    firebaseRef.authWithPassword({
+      "email": "dborkan@gmail.com",
+      "password": "horseRocket"
+    }, function(error, authData) {
+      if (error) {
+        rejectAuth(new Error('Login Failed, ' + error));
+      } else {
+        console.log("Authenticated successfully with payload:", authData);
+        fulfillAuth(authData);
       }
-    } else {
-      console.log("Successfully created user account", userData);
-    }
-  });
-  return Promise.reject('TOOD: remove!');
+    }.bind(this));
+  }.bind(this));
+
+  // firebaseRef.createUser({
+  //   email: "uproxyeva@gmail.com",
+  //   password: "horseRocket"
+  // }, function(error, userData) {
+  //   if (error) {
+  //     switch (error.code) {
+  //       case "EMAIL_TAKEN":
+  //         console.log("The new user account cannot be created because the email is already in use.");
+  //         break;
+  //       case "INVALID_EMAIL":
+  //         console.log("The specified email is not a valid email.");
+  //         break;
+  //       default:
+  //         console.log("Error creating user:", error);
+  //     }
+  //   } else {
+  //     console.log("Successfully created user account", userData);
+  //   }
+  // });
+  // return Promise.reject('TOOD: remove!');
 };
 
 /*
@@ -36,39 +50,40 @@ EmailSocialProvider.prototype.authenticate_ = function(firebaseRef) {
  * fetching) for each contact.
  */
 EmailSocialProvider.prototype.loadContacts_ = function() {
-  this.facebookGet_('me/friends').then(function(resp) {
-    var users = resp.data;
-    for (var i = 0; i < users.length; ++i) {
-      this.addUserProfile_({
-        userId: users[i].id,
-        name: users[i].name,
-        url: 'https://www.facebook.com/' + users[i].id
-      });
-      this.getUserImage_(users[i].id);
-    }
-  }.bind(this)).catch(function(e) {
-    this.logger.error('loadContacts_ failed', e);
-  }.bind(this));
+  // TODO: remove this crazy hack!
+  if (this.getUserId_() == '1') {
+    this.addUserProfile_({userId: '2', name: 'uproxyeva@gmail.com'});
+  } else if (this.getUserId_() == '2') {
+    this.addUserProfile_({userId: '1', name: 'dborkan@gmail.com'});
+  }
 };
 
 /*
  * Returns UserProfile object for the logged in user.
  */
 EmailSocialProvider.prototype.getMyUserProfile_ = function() {
-  // TODO: does this need to change for email?
   if (!this.loginState_) {
     throw 'Error in EmailSocialProvider.getMyUserProfile_: not logged in';
   }
-  var cachedUserProfile =
-      this.loginState_.authData[this.networkName_].cachedUserProfile;
   return {
     userId: this.getUserId_(),
-    name: cachedUserProfile.name,
+    name: this.loginState_.authData.password.email,
     lastUpdated: Date.now(),
-    url: cachedUserProfile.link,
-    imageData: cachedUserProfile.picture.data.url
+    url: '',
+    imageData: ''
   };
 };
+
+EmailSocialProvider.prototype.getUserId_ = function() {
+  if (!this.loginState_) {
+    throw 'Error in FirebaseSocialProvider.getUserId_: not logged in';
+  }
+  //return 'dborkanATgmail';  // TODO: remove
+  //return this.loginState_.authData.password.email;
+  var uid = this.loginState_.authData.uid;
+  return uid.substr(uid.indexOf(':') + 1);
+};
+
 
 // Register provider when in a module context.
 if (typeof freedom !== 'undefined') {
