@@ -7,41 +7,51 @@ EmailSocialProvider = function(dispatchEvent) {
 };
 EmailSocialProvider.prototype = new FirebaseSocialProvider();
 
-EmailSocialProvider.prototype.authenticate_ = function(firebaseRef) {
+EmailSocialProvider.prototype.authenticate_ = function(firebaseRef, userId, password) {
   return new Promise(function(fulfillAuth, rejectAuth) {
-    firebaseRef.authWithPassword({
-      "email": "dborkan@gmail.com",
-      "password": "horseRocket"
-    }, function(error, authData) {
+    var email = userId + '@uproxy-firebase.com';  // TODO: use a real address?
+    firebaseRef.createUser({
+      email: email,
+      password: password
+    }, function(error, userData) {
+      var auth = function() {
+        console.log('calling auth!');
+        firebaseRef.authWithPassword({
+          email: email,
+          password: password
+        }, function(error, authData) {
+          if (error) {
+            rejectAuth(new Error('Login Failed, ' + error));
+          } else {
+            console.log("Authenticated successfully with payload:", authData);
+            fulfillAuth(authData);
+          }
+        }.bind(this));
+      }.bind(this);
+
       if (error) {
-        rejectAuth(new Error('Login Failed, ' + error));
+        switch (error.code) {
+          case "EMAIL_TAKEN":
+            console.log("The new user account cannot be created because the email is already in use.");
+            auth();
+            return;
+
+          case "INVALID_EMAIL":
+            console.log("The specified email is not a valid email.");
+            rejectAuth("The specified email is not a valid email.");
+            return;
+
+          default:
+            console.log("Error creating user:", error);
+            rejectAuth("Error creating user " + error);
+        }
       } else {
-        console.log("Authenticated successfully with payload:", authData);
-        fulfillAuth(authData);
+        console.log("Successfully created user account", userData);
+        auth();
       }
-    }.bind(this));
+    });
   }.bind(this));
 
-  // firebaseRef.createUser({
-  //   email: "uproxyeva@gmail.com",
-  //   password: "horseRocket"
-  // }, function(error, userData) {
-  //   if (error) {
-  //     switch (error.code) {
-  //       case "EMAIL_TAKEN":
-  //         console.log("The new user account cannot be created because the email is already in use.");
-  //         break;
-  //       case "INVALID_EMAIL":
-  //         console.log("The specified email is not a valid email.");
-  //         break;
-  //       default:
-  //         console.log("Error creating user:", error);
-  //     }
-  //   } else {
-  //     console.log("Successfully created user account", userData);
-  //   }
-  // });
-  // return Promise.reject('TOOD: remove!');
 };
 
 /*
