@@ -352,7 +352,8 @@ FirebaseSocialProvider.prototype.getUserId_ = function() {
   if (!this.loginState_) {
     throw 'Error in FirebaseSocialProvider.getUserId_: not logged in';
   }
-  return this.loginState_.authData[this.networkName_].id;
+  var provider = this.loginState_.authData.provider;
+  return this.loginState_.authData[provider].id;
 };
 
 
