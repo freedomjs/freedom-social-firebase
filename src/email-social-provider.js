@@ -8,6 +8,8 @@ EmailSocialProvider = function(dispatchEvent) {
 EmailSocialProvider.prototype = new FirebaseSocialProvider();
 
 EmailSocialProvider.prototype.authenticate_ = function(firebaseRef, userName, password) {
+  // TODO: use new createAccount paramter!!!!
+
   var setProfile = function(authData) {
     this.name = userName;  // TODO: this is hacky, move elsewhere and cleanup all use of this.name
 
@@ -21,9 +23,10 @@ EmailSocialProvider.prototype.authenticate_ = function(firebaseRef, userName, pa
   }.bind(this);
 
   return new Promise(function(fulfillAuth, rejectAuth) {
-    var email = 'firebase.' + userName + '@uproxy.org';
+    var email = 'firebase+' + userName + '@uproxy.org';
     // Remove any whitespace characters.
     // TODO: are there other characters we should check for?
+    // TODO: make lowercase?
     email = email.replace(/\s+/g, '');
 
     firebaseRef.createUser({
@@ -83,19 +86,14 @@ EmailSocialProvider.prototype.loadContacts_ = function() {
   this.on_(allFriendsRef, 'child_added', function(snapshot) {
     var friendId = snapshot.key().substr('simplelogin:'.length);
     console.log('got friendId ' + friendId);
-
-    // TODO: there are race conditions where if child_added for all friends is done, then
-    // child_added for friendRequests, then value for all friends....  blah blah blah
-    // you hit the duplicate..  Maybe just get rid of warning trace!
-    if (this.loginState_.userProfiles[friendId]) {
-      // TODO: kinda hacky.. This ignores newly added profiles as a result of
-      // processing friendRequests
-      return;
-    }
-
     var friendProfileRef = new Firebase(
       this.allUsersUrl_ + '/simplelogin:' + friendId + '/profile/');
     friendProfileRef.once('value', function(snapshot) {
+      if (this.loginState_.userProfiles[friendId]) {
+        // TODO: kinda hacky.. This ignores newly added profiles as a result of
+        // processing friendRequests
+        return;
+      }
       console.log('adding pre-existing profile, ' + friendId + ', ' + snapshot.val().name);
       this.addUserProfile_({userId: friendId, name: snapshot.val().name});
     }.bind(this), function(error) {
@@ -217,13 +215,10 @@ EmailSocialProvider.prototype.addContact = function(encodedToken) {
 
 
 // Register provider when in a module context.
-console.log('registering email provider: A');
 if (typeof freedom !== 'undefined') {
   if (!freedom.social) {
-    console.log('registering email provider: B');
     freedom().providePromises(EmailSocialProvider);
   } else {
-    console.log('registering email provider: C');
     freedom.social().providePromises(EmailSocialProvider);
   }
 }
