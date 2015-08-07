@@ -173,6 +173,17 @@ FirebaseSocialProvider.prototype.initState_ = function() {
   this.loginState_ = null;
 };
 
+// TODO: explain
+FirebaseSocialProvider.prototype.addRequestedUserProfile_ = function(friend) {
+  this.loginState_.userProfiles[friend.userId] = {
+    userId: friend.userId,
+    name: friend.name || '',
+    state: 'INVITE_SENT'
+  };
+  this.dispatchEvent_(
+      'onUserProfile', this.loginState_.userProfiles[friend.userId]);
+};
+
 /*
  * Adds a UserProfile.
  */
@@ -192,7 +203,8 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
       name: friend.name || '',
       lastUpdated: Date.now(),
       url: friend.url || '',
-      imageData: friend.imageData || ''
+      imageData: friend.imageData || '',
+      state: 'FRIEND'
     };
     this.dispatchEvent_(
         'onUserProfile', this.loginState_.userProfiles[friend.userId]);
@@ -251,7 +263,8 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
     name: friend.name || '',
     lastUpdated: Date.now(),
     url: friend.url || '',
-    imageData: friend.imageData || ''
+    imageData: friend.imageData || '',
+    state: 'FRIEND'
   };
   this.dispatchEvent_(
       'onUserProfile', this.loginState_.userProfiles[friend.userId]);

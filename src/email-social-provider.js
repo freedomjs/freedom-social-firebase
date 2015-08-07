@@ -10,6 +10,8 @@ EmailSocialProvider.prototype = new FirebaseSocialProvider();
 EmailSocialProvider.prototype.authenticate_ = function(firebaseRef, userName, password) {
   // TODO: use new createAccount paramter!!!!
 
+  var email = this.getEmailFromName_(userName);
+
   var setProfile = function(authData) {
     this.name = userName;  // TODO: this is hacky, move elsewhere and cleanup all use of this.name
 
@@ -20,14 +22,17 @@ EmailSocialProvider.prototype.authenticate_ = function(firebaseRef, userName, pa
     // Note this is the name that appears in the UserProfile, it may contain
     // spaces, etc.
     profileRef.update({name: userName});
+
+    // TODO: ensureu that only logged in user can update this (update rules)
+    // TODO: This will require changes for Firebase to expose the email to auth rules
+    var userMappingRef = new Firebase(
+        this.baseUrl_ + 'simplelogin-user-mapping/' + this.formatEmailForRef_(email));
+    userMappingRef.set(authData.uid, function(error) {
+      console.log('userMappingRef.update resulted in ' + error);
+    });
   }.bind(this);
 
   return new Promise(function(fulfillAuth, rejectAuth) {
-    var email = 'firebase+' + userName + '@uproxy.org';
-    // Remove any whitespace characters.
-    // TODO: are there other characters we should check for?
-    // TODO: make lowercase?
-    email = email.replace(/\s+/g, '');
 
     firebaseRef.createUser({
       email: email,
@@ -86,9 +91,9 @@ EmailSocialProvider.prototype.loadContacts_ = function() {
   this.on_(allFriendsRef, 'child_added', function(snapshot) {
     var friendId = snapshot.key().substr('simplelogin:'.length);
     console.log('got friendId ' + friendId);
-    var friendProfileRef = new Firebase(
-      this.allUsersUrl_ + '/simplelogin:' + friendId + '/profile/');
-    friendProfileRef.once('value', function(snapshot) {
+    var friendProfileUrl =
+      this.allUsersUrl_ + '/simplelogin:' + friendId + '/profile/';
+    this.readOnce_(friendProfileUrl).then(function(snapshot) {
       if (this.loginState_.userProfiles[friendId]) {
         // TODO: kinda hacky.. This ignores newly added profiles as a result of
         // processing friendRequests
@@ -96,10 +101,6 @@ EmailSocialProvider.prototype.loadContacts_ = function() {
       }
       console.log('adding pre-existing profile, ' + friendId + ', ' + snapshot.val().name);
       this.addUserProfile_({userId: friendId, name: snapshot.val().name});
-    }.bind(this), function(error) {
-      // TODO: if the friend didn't actually add us (accept our friendRequest)
-      // this will fail to read due to permissions..  Not actually an error
-      console.log('error is !!!! ', error);
     }.bind(this));
   }.bind(this));
 
@@ -125,6 +126,34 @@ EmailSocialProvider.prototype.loadContacts_ = function() {
   }.bind(this));
 };
 
+// TODO: use this more
+// Returns a promise with the snapshot
+EmailSocialProvider.prototype.readOnce_ = function(url) {
+  return new Promise(function(F, R) {
+    var ref = new Firebase(url);
+    ref.once('value', function(snapshot) {
+      F(snapshot);
+    }.bind(this), function(error) {
+      console.error('Failed to read ' + url, error);
+      R(error);
+    }.bind(this));
+  }.bind(this));
+};
+
+EmailSocialProvider.prototype.setOnce_ = function(url, data) {
+  return new Promise(function(F, R) {
+    var ref = new Firebase(url);
+    ref.set(data, function(error) {
+      if (error) {
+        console.error('error setting url ' + url, error);
+        R(error);
+      } else {
+        F();
+      }
+    }.bind(this));
+  }.bind(this));
+};
+
 /*
  * Returns UserProfile object for the logged in user.
  */
@@ -141,6 +170,7 @@ EmailSocialProvider.prototype.getMyUserProfile_ = function() {
   };
 };
 
+// TODO: is this really needed?  Can I remove it?
 EmailSocialProvider.prototype.getUserId_ = function() {
   if (!this.loginState_) {
     throw 'Error in FirebaseSocialProvider.getUserId_: not logged in';
@@ -151,65 +181,113 @@ EmailSocialProvider.prototype.getUserId_ = function() {
   return uid.substr(uid.indexOf(':') + 1);
 };
 
-EmailSocialProvider.prototype.getIntroductionToken = function() {
+// TODO: the API isn't really accurate here, it says userId but it's really
+// user name (e.g. "daniel" rather than simplelogin:<number>)
+// TODO: we should figure out what we want the userId exposed to uproxy to be?
+// maybe it should be the readable name and simplelogin:x just used internal to
+// this class?
+EmailSocialProvider.prototype.inviteUser = function(friendUserName) {
   if (!this.loginState_) {
-    throw 'Error in FirebaseSocialProvider.getUserId_: not logged in';
+    throw 'Error in FirebaseSocialProvider.inviteUser: not logged in';
   }
-  // TODO: clarify name, is it token, code, secret, etc?
-  var uid = this.loginState_.authData.uid;
-  var permissionToken = Math.floor(Math.random() * 100000000000);
-  var tokenUrl = this.allUsersUrl_ + '/' + uid + '/generatedInviteTokens/'+ permissionToken;
-  console.log('tokenUrl ' + tokenUrl);
-  var tokenRef = new Firebase(tokenUrl);
-  tokenRef.set({timestamp: Date.now()});
 
-  // TODO: this userId is the numeric ID, not the name!!!
-  // TODO: make userId and name consistent!!
-  var jsonString = JSON.stringify(
-    {userId: this.getUserId_(), token: permissionToken, name: this.name});
-  return Promise.resolve(btoa(jsonString));
+  // TODO: all this stuff where some ids have simplelogin: prepended and some
+  // don't are nuts!
+  return this.getIdFromName_(friendUserName).then(function(friendUserId) {
+    console.log('getIdFromName_: ' + friendUserName + ' -> ' + friendUserId);
+    // Write to friend's receivedFriendRequests folder
+    this.setOnce_(
+      this.allUsersUrl_ + '/' + friendUserId + '/receivedFriendRequests/simplelogin:' + this.getUserId_(),
+      this.name);
+    // TODO: wait for first write to finish?
+    // Write to our own sentFriendRequests folder
+    this.setOnce_(
+      this.allUsersUrl_ + '/simplelogin:' + this.getUserId_() + '/sentFriendRequests/' + friendUserId,
+      friendUserName);
+    this.addRequestedUserProfile_({
+      userId: friendUserId.substr('simplelogin:'.length),
+      name: friendUserName
+    });
+  }.bind(this));
 };
 
-EmailSocialProvider.prototype.addContact = function(encodedToken) {
+EmailSocialProvider.prototype.getEmailFromName_ = function(userName) {
+  var email = 'firebase+' + userName + '@uproxy.org';
+  // Remove any whitespace characters.
+  // TODO: are there other characters we should check for?
+  // TODO: make lowercase?
+  email = email.replace(/\s+/g, '');
+  return email;
+};
+
+EmailSocialProvider.prototype.formatEmailForRef_ = function(email) {
+  // Firebase URLs can't have . # $ [ or ]
+  // TODO: full regex
+  var formattedEmail = email.replace(/\./g, '');
+  // TODO: for some reason + turns into space, so replace it with a - instead
+  formattedEmail = formattedEmail.replace(/\+/g, '-');
+  return formattedEmail;
+};
+
+// TODO: need to be clear which ids contain "simplelogin:"... currently this one does
+EmailSocialProvider.prototype.getIdFromName_ = function(userName) {
+  var email = this.getEmailFromName_(userName);
+  var userMappingUrl = this.baseUrl_ + 'simplelogin-user-mapping/' + this.formatEmailForRef_(email);
+  return this.readOnce_(userMappingUrl).then(function(snapshot) {
+    return snapshot.val();
+  }.bind(this));
+  //   var userMappingRef = new Firebase(userMappingUrl);
+  //   userMappingRef.once('value', function(snapshot) {
+  //     F(snapshot.val());
+  //   }.bind(this), function(error) {
+  //     console.log('error in userMappingRef.once value');
+  //     R('error');  // TODO:
+  //   }.bind(this));
+  // }.bind(this));
+};
+
+EmailSocialProvider.prototype.acceptUserInvitation = function(userId) {
+  if (!this.loginState_) {
+    throw 'Error in FirebaseSocialProvider.acceptUserInvitation: not logged in';
+  }
   return new Promise(function(F, R) {
-    console.log('addContact called with ' + encodedToken);
-    // TODO: try/catch
-    var data = JSON.parse(atob(encodedToken));
-    console.log('data ', data);
+    // // TODO: try/catch
+    // var data = JSON.parse(atob(encodedToken));
+    // console.log('data ', data);
 
-    // Try to write to friends friendRequest folder
-    var myUserId = this.getUserId_();
-    var myName = this.name;
-    var friendUserId = data.userId;
-    var friendName = data.name;
-    var token = data.token;
+    // // Try to write to friends friendRequest folder
+    // var myUserId = this.getUserId_();
+    // var myName = this.name;
+    // var friendUserId = data.userId;
+    // var friendName = data.name;
+    // var token = data.token;
 
-    // Sanity check
-    if (friendUserId === myUserId) {
-      return R('friendId matches self'); // TODO: better error
-    }
+    // // Sanity check
+    // if (friendUserId === myUserId) {
+    //   return R('friendId matches self'); // TODO: better error
+    // }
 
-    var receivedInviteTokensRef = new Firebase(
-      this.allUsersUrl_ + '/simplelogin:' + myUserId + '/receivedInviteTokens/' + token);
-    receivedInviteTokensRef.set({received: true}, function(error) {
-      console.log('pushed');
-      if (error) {
-        console.error('error writing to receivedInviteTokens');  // should never happen
-        return R('error writing to receivedInviteTokens');
-      }
+    // var receivedInviteTokensRef = new Firebase(
+    //   this.allUsersUrl_ + '/simplelogin:' + myUserId + '/receivedInviteTokens/' + token);
+    // receivedInviteTokensRef.set({received: true}, function(error) {
+    //   console.log('pushed');
+    //   if (error) {
+    //     console.error('error writing to receivedInviteTokens');  // should never happen
+    //     return R('error writing to receivedInviteTokens');
+    //   }
 
-      var friendRequestUrl = this.allUsersUrl_ + '/simplelogin:' + friendUserId + '/friendRequests/' + token;
-      console.log('friendRequestUrl: ' + friendRequestUrl);
-      var friendRequestRef = new Firebase(friendRequestUrl);
-      friendRequestRef.push({userId: myUserId, name: myName}, function(error) {
-        console.log('push to friendRequestRef completed with error ' + error);
-        if (error) {
-          return R('Not permissioned to add friend');
-        }
-        F();
-        this.addUserProfile_({userId: friendUserId, name: friendName});
-      }.bind(this));
-    }.bind(this));
+    //   var friendRequestUrl = this.allUsersUrl_ + '/simplelogin:' + friendUserId + '/friendRequests/' + token;
+    //   console.log('friendRequestUrl: ' + friendRequestUrl);
+    //   var friendRequestRef = new Firebase(friendRequestUrl);
+    //   friendRequestRef.push({userId: myUserId, name: myName}, function(error) {
+    //     console.log('push to friendRequestRef completed with error ' + error);
+    //     if (error) {
+    //       return R('Not permissioned to add friend');
+    //     }
+    //     F();
+    //     this.addUserProfile_({userId: friendUserId, name: friendName});
+    //   }.bind(this));
+    // }.bind(this));
   }.bind(this));
 };
 

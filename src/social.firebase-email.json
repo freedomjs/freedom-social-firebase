@@ -55,15 +55,17 @@
         }
       },
 
-      "getIntroductionToken": {
+      "inviteUser": {
         "type": "method",
-        "value": [],
-        "ret": "string"
+        "value": ["string"],
+        "ret": "Object"
       },
 
-      "addContact": {
+      "acceptUserInvitation": {
         "type": "method",
-        "value": ["string"]
+        "value": [{
+          "userId": "string"
+        }]
       },
 
       "clearCachedCredentials": {"type": "method", "value": []},
