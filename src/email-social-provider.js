@@ -80,77 +80,43 @@ EmailSocialProvider.prototype.authenticate_ = function(firebaseRef, userName, pa
 };
 
 /*
- * Loads contacts of the logged in user, and calls this.addUserProfile_
+ * Loads contacts of the logged in user, and calls this.addFriendUserProfile_
  * and this.updateUserProfile_ (if needed later, e.g. for async image
  * fetching) for each contact.
  */
 EmailSocialProvider.prototype.loadContacts_ = function() {
+  // Load all established (not invited) friends
   var allFriendsRef = new Firebase(
     this.allUsersUrl_ + '/simplelogin:' + this.getUserId_() + '/friends/');
-  // TODO: is on correct or should it be once?
   this.on_(allFriendsRef, 'child_added', function(snapshot) {
-    var friendId = snapshot.key().substr('simplelogin:'.length);
-    console.log('got friendId ' + friendId);
-    var friendProfileUrl =
-      this.allUsersUrl_ + '/simplelogin:' + friendId + '/profile/';
-    this.readOnce_(friendProfileUrl).then(function(snapshot) {
-      if (this.loginState_.userProfiles[friendId]) {
-        // TODO: kinda hacky.. This ignores newly added profiles as a result of
-        // processing friendRequests
-        return;
-      }
-      console.log('adding pre-existing profile, ' + friendId + ', ' + snapshot.val().name);
-      this.addUserProfile_({userId: friendId, name: snapshot.val().name});
-    }.bind(this));
+    var friendUserId = snapshot.key().substr('simplelogin:'.length);
+    var state = snapshot.val().state;
+    var name = snapshot.val().name;
+    if (state == 'FRIEND') {
+      this.addFriendUserProfile_({userId: friendUserId, name: name});
+    } else if (state == 'INVITE_SENT') {
+      // TODO: weird that we have to include INVITE_SENT
+      // TODO: we are no longer using the /friend/profile folder..  can that be removed from JSON rules?
+      this.addInviteSentUserProfile_({userId: friendUserId, name: name, state: 'INVITE_SENT'});
+    }
   }.bind(this));
 
   // Monitor friend requests.
-  // TODO: these should all be permissioned already, but should we double check?
   var friendRequestsRef = new Firebase(
-    this.allUsersUrl_ + '/simplelogin:' + this.getUserId_() + '/friendRequests/');
-  // TODO: is on correct or should it be once?
+    this.allUsersUrl_ + '/simplelogin:' + this.getUserId_() + '/receivedFriendRequests/');
   this.on_(friendRequestsRef, 'child_added', function(snapshot) {
-
-    console.log('got friendRequest ' + snapshot.key() + ', ', snapshot.val());
-    console.log('... ' + snapshot.child(snapshot.key()).val());
-    snapshot.forEach(function(childSnapshot) {
-      var val = childSnapshot.val();
-      var friendId = val.userId;
-      if (this.loginState_.userProfiles[friendId]) {
-        // Sanity check that friend doesn't already exist.
-        return;
-      }
-      this.addUserProfile_({userId: friendId, name: val.name});
-      // TODO: delete snapshot!
-    }.bind(this));
+    var friendUserId = snapshot.key().substr('simplelogin:'.length);
+    var name = snapshot.val();
+    this.addInviteReceivedUserProfile_({userId: friendUserId, name: name, state: 'INVITE_RECEIVED'});
   }.bind(this));
-};
 
-// TODO: use this more
-// Returns a promise with the snapshot
-EmailSocialProvider.prototype.readOnce_ = function(url) {
-  return new Promise(function(F, R) {
-    var ref = new Firebase(url);
-    ref.once('value', function(snapshot) {
-      F(snapshot);
-    }.bind(this), function(error) {
-      console.error('Failed to read ' + url, error);
-      R(error);
-    }.bind(this));
-  }.bind(this));
-};
-
-EmailSocialProvider.prototype.setOnce_ = function(url, data) {
-  return new Promise(function(F, R) {
-    var ref = new Firebase(url);
-    ref.set(data, function(error) {
-      if (error) {
-        console.error('error setting url ' + url, error);
-        R(error);
-      } else {
-        F();
-      }
-    }.bind(this));
+  // Monitor accepted friend requests.
+  var friendRequestsRef = new Firebase(
+    this.allUsersUrl_ + '/simplelogin:' + this.getUserId_() + '/acceptedFriendRequests/');
+  this.on_(friendRequestsRef, 'child_added', function(snapshot) {
+    var friendUserId = snapshot.key().substr('simplelogin:'.length);
+    var name = snapshot.val();
+    this.addFriendUserProfile_({userId: friendUserId, name: name});
   }.bind(this));
 };
 
@@ -204,9 +170,10 @@ EmailSocialProvider.prototype.inviteUser = function(friendUserName) {
     this.setOnce_(
       this.allUsersUrl_ + '/simplelogin:' + this.getUserId_() + '/sentFriendRequests/' + friendUserId,
       friendUserName);
-    this.addRequestedUserProfile_({
+    this.addInviteSentUserProfile_({
       userId: friendUserId.substr('simplelogin:'.length),
-      name: friendUserName
+      name: friendUserName,
+      state: 'INVITE_SENT'
     });
   }.bind(this));
 };
@@ -236,58 +203,23 @@ EmailSocialProvider.prototype.getIdFromName_ = function(userName) {
   return this.readOnce_(userMappingUrl).then(function(snapshot) {
     return snapshot.val();
   }.bind(this));
-  //   var userMappingRef = new Firebase(userMappingUrl);
-  //   userMappingRef.once('value', function(snapshot) {
-  //     F(snapshot.val());
-  //   }.bind(this), function(error) {
-  //     console.log('error in userMappingRef.once value');
-  //     R('error');  // TODO:
-  //   }.bind(this));
-  // }.bind(this));
 };
 
-EmailSocialProvider.prototype.acceptUserInvitation = function(userId) {
+EmailSocialProvider.prototype.acceptUserInvitation = function(friendUserId) {
   if (!this.loginState_) {
     throw 'Error in FirebaseSocialProvider.acceptUserInvitation: not logged in';
   }
+  var friendData = this.loginState_.userProfiles[friendUserId];
+  if (!this.loginState_) {
+    throw 'Friend not found, ' + friendUserId;
+  }
+  var friendUserName = friendData.name;
   return new Promise(function(F, R) {
-    // // TODO: try/catch
-    // var data = JSON.parse(atob(encodedToken));
-    // console.log('data ', data);
-
-    // // Try to write to friends friendRequest folder
-    // var myUserId = this.getUserId_();
-    // var myName = this.name;
-    // var friendUserId = data.userId;
-    // var friendName = data.name;
-    // var token = data.token;
-
-    // // Sanity check
-    // if (friendUserId === myUserId) {
-    //   return R('friendId matches self'); // TODO: better error
-    // }
-
-    // var receivedInviteTokensRef = new Firebase(
-    //   this.allUsersUrl_ + '/simplelogin:' + myUserId + '/receivedInviteTokens/' + token);
-    // receivedInviteTokensRef.set({received: true}, function(error) {
-    //   console.log('pushed');
-    //   if (error) {
-    //     console.error('error writing to receivedInviteTokens');  // should never happen
-    //     return R('error writing to receivedInviteTokens');
-    //   }
-
-    //   var friendRequestUrl = this.allUsersUrl_ + '/simplelogin:' + friendUserId + '/friendRequests/' + token;
-    //   console.log('friendRequestUrl: ' + friendRequestUrl);
-    //   var friendRequestRef = new Firebase(friendRequestUrl);
-    //   friendRequestRef.push({userId: myUserId, name: myName}, function(error) {
-    //     console.log('push to friendRequestRef completed with error ' + error);
-    //     if (error) {
-    //       return R('Not permissioned to add friend');
-    //     }
-    //     F();
-    //     this.addUserProfile_({userId: friendUserId, name: friendName});
-    //   }.bind(this));
-    // }.bind(this));
+    // TODO: none of this is tested!
+    this.setOnce_(
+          this.allUsersUrl_ + '/simplelogin:' + friendUserId + '/acceptedFriendRequests/simplelogin:' + this.getUserId_(),
+          this.name);
+    this.addFriendUserProfile_({userId: friendUserId, name: friendUserName});
   }.bind(this));
 };
 

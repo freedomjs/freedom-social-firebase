@@ -63,9 +63,7 @@
 
       "acceptUserInvitation": {
         "type": "method",
-        "value": [{
-          "userId": "string"
-        }]
+        "value": ["string"]
       },
 
       "clearCachedCredentials": {"type": "method", "value": []},

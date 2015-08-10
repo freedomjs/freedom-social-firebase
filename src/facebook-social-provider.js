@@ -40,7 +40,7 @@ FacebookSocialProvider.prototype.getOAuthToken_ = function() {
 };
 
 /*
- * Loads contacts of the logged in user, and calls this.addUserProfile_
+ * Loads contacts of the logged in user, and calls this.addFriendUserProfile_
  * and this.updateUserProfile_ (if needed later, e.g. for async image
  * fetching) for each contact.
  */
@@ -48,7 +48,7 @@ FacebookSocialProvider.prototype.loadContacts_ = function() {
   this.facebookGet_('me/friends').then(function(resp) {
     var users = resp.data;
     for (var i = 0; i < users.length; ++i) {
-      this.addUserProfile_({
+      this.addFriendUserProfile_({
         userId: users[i].id,
         name: users[i].name,
         url: 'https://www.facebook.com/' + users[i].id

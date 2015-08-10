@@ -46,7 +46,7 @@ GoogleSocialProvider.prototype.getOAuthToken_ = function() {
 };
 
 /*
- * Loads contacts of the logged in user, and calls this.addUserProfile_
+ * Loads contacts of the logged in user, and calls this.addFriendUserProfile_
  * and this.updateUserProfile_ (if needed later, e.g. for async image
  * fetching) for each contact.
  */
@@ -56,7 +56,7 @@ GoogleSocialProvider.prototype.loadContacts_ = function() {
   this.googleGet_('plus/v1/people/me/people/visible').then(function(resp) {
     for (var i = 0; i < resp.items.length; ++i) {
       var friend = resp.items[i];
-      this.addUserProfile_({
+      this.addFriendUserProfile_({
         userId: friend.id,
         name: friend.displayName,
         imageData: friend.image.url,

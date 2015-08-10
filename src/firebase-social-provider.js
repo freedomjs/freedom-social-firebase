@@ -9,7 +9,7 @@ Firebase.INTERNAL.forceWebSockets();
  * - an authenticate method which returns a Promise that fulfills with
  *   a Firebase authData object.
  * - a loadContacts_ method, which should load user profiles and invoke
- *   .addUserProfile_ and .updateUserProfile_ as needed.
+ *   .addFriendUserProfile_ and .updateUserProfile_ as needed.
  * - a .getMyUserProfile_ method, which returns the logged in user's profile.
  */
 var FirebaseSocialProvider = function() {
@@ -78,7 +78,7 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
       fulfillLogin(myClientState);
 
       // Emits my UserProfile.
-      this.addUserProfile_(this.getMyUserProfile_());
+      this.addFriendUserProfile_(this.getMyUserProfile_());
 
       this.loadContacts_();
     }.bind(this)).catch(function(err) {
@@ -173,22 +173,42 @@ FirebaseSocialProvider.prototype.initState_ = function() {
   this.loginState_ = null;
 };
 
-// TODO: explain
-FirebaseSocialProvider.prototype.addRequestedUserProfile_ = function(friend) {
-  this.loginState_.userProfiles[friend.userId] = {
-    userId: friend.userId,
-    name: friend.name || '',
-    state: 'INVITE_SENT'
-  };
-  this.dispatchEvent_(
-      'onUserProfile', this.loginState_.userProfiles[friend.userId]);
+// TODO: make these take id and name, not state
+FirebaseSocialProvider.prototype.addInviteReceivedUserProfile_ = function(friend) {
+  if (friend.state != 'INVITE_RECEIVED') {
+    throw 'addInviteSentUserProfile_ called with incorrect state ' + friend.state;
+  }
+  this.loginState_.userProfiles[friend.userId] = friend;
+  this.dispatchEvent_('onUserProfile', friend);
+};
+
+FirebaseSocialProvider.prototype.addInviteSentUserProfile_ = function(friend) {
+  if (friend.state != 'INVITE_SENT') {
+    throw 'addInviteSentUserProfile_ called with incorrect state ' + friend.state;
+  }
+  this.loginState_.userProfiles[friend.userId] = friend;
+  this.dispatchEvent_('onUserProfile', friend);
+  this.setFriendDirectory_(friend.userId, friend.name, friend.state);
+};
+
+FirebaseSocialProvider.prototype.setFriendDirectory_ = function(
+    friendUserId, name, state) {
+  if (state != 'FRIEND' && state != 'INVITE_SENT') {
+    throw 'setFriendDirectory_ called with incorrect state ' + state;
+  }
+  var myRefForFriend = new Firebase(
+      this.allUsersUrl_ + '/' + this.networkName_ + ':' + this.getUserId_() +
+      '/friends/' + this.networkName_ + ':' + friendUserId);
+  // use update, not set, to preserve existing data
+  myRefForFriend.update({name: name, state: state});
 };
 
 /*
  * Adds a UserProfile.
  */
-FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
-  if (this.loginState_.userProfiles[friend.userId]) {
+FirebaseSocialProvider.prototype.addFriendUserProfile_ = function(friend) {
+  if (this.loginState_.userProfiles[friend.userId] &&
+      this.loginState_.userProfiles[friend.userId] === 'FRIEND') {
     this.logger.warn('addUserProfile called for existing user ', friend);
     return;
   }
@@ -211,19 +231,14 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
     return;
   }
 
-  // Ensure that a permanent friend object exists, with the users name.
-  // This must be present in order for other friends to properly detect our
-  // clients, based on the current Firebase rules configuration.
-  var myRefForFriend = new Firebase(
-      this.allUsersUrl_ + '/' + this.networkName_ + ':' + this.getUserId_() +
-      '/friends/' + this.networkName_ + ':' + friend.userId);
-  // use update, not set, to preserve existing data
-  myRefForFriend.update({isFriend: true});
+  this.setFriendDirectory_(friend.userId, friend.name, 'FRIEND');
 
   // Set an inbox, writable only by my friend, and unique to this
   // agent (client).  This should be cleared when I disconnect.
-  var myInboxForFriendRef = myRefForFriend.child(
-      'inbox/' + this.loginState_.agent);
+  var myInboxForFriendRef = new Firebase(
+      this.allUsersUrl_ + '/' + this.networkName_ + ':' + this.getUserId_() +
+      '/friends/' + this.networkName_ + ':' + friend.userId +
+      '/inbox/' + this.loginState_.agent);
   myInboxForFriendRef.onDisconnect().remove();
 
   // Monitor my new inbox.  Note that messages may have already been written to
@@ -408,6 +423,33 @@ FirebaseSocialProvider.prototype.oauth_ = function(firebaseRef) {
           return fulfillOAuth(authData);
         }
       }.bind(this));
+    }.bind(this));
+  }.bind(this));
+};
+
+// Returns a promise with the snapshot
+FirebaseSocialProvider.prototype.readOnce_ = function(url) {
+  return new Promise(function(F, R) {
+    var ref = new Firebase(url);
+    ref.once('value', function(snapshot) {
+      F(snapshot);
+    }.bind(this), function(error) {
+      console.error('Failed to read ' + url, error);
+      R(error);
+    }.bind(this));
+  }.bind(this));
+};
+
+FirebaseSocialProvider.prototype.setOnce_ = function(url, data) {
+  return new Promise(function(F, R) {
+    var ref = new Firebase(url);
+    ref.set(data, function(error) {
+      if (error) {
+        console.error('error setting url ' + url, error);
+        R(error);
+      } else {
+        F();
+      }
     }.bind(this));
   }.bind(this));
 };
