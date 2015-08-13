@@ -106,7 +106,7 @@ EmailSocialProvider.prototype.loadContacts_ = function() {
   // Monitor friend requests.
   // TODO: these should all be permissioned already, but should we double check?
   var friendRequestsRef = new Firebase(
-    this.allUsersUrl_ + '/simplelogin:' + this.getUserId_() + '/friendRequests/');
+    this.allUsersUrl_ + '/simplelogin:' + this.getUserId_() + '/friendRequestsWithToken/');
   // TODO: is on correct or should it be once?
   this.on_(friendRequestsRef, 'child_added', function(snapshot) {
 
@@ -198,7 +198,7 @@ EmailSocialProvider.prototype.addContact = function(encodedToken) {
         return R('error writing to receivedInviteTokens');
       }
 
-      var friendRequestUrl = this.allUsersUrl_ + '/simplelogin:' + friendUserId + '/friendRequests/' + token;
+      var friendRequestUrl = this.allUsersUrl_ + '/simplelogin:' + friendUserId + '/friendRequestsWithToken/' + token;
       console.log('friendRequestUrl: ' + friendRequestUrl);
       var friendRequestRef = new Firebase(friendRequestUrl);
       friendRequestRef.push({userId: myUserId, name: myName}, function(error) {
