@@ -6,17 +6,37 @@ FacebookSocialProvider = function(dispatchEvent) {
 };
 FacebookSocialProvider.prototype = new FirebaseSocialProvider();
 
-FacebookSocialProvider.prototype.authenticate_ = function(firebaseRef) {
-  return this.oauth_(firebaseRef);
-};
-
 /*
  * Returns a Promise which fulfills with an OAuth token.
  */
-FacebookSocialProvider.prototype.getOAuthToken_ = function() {
+FacebookSocialProvider.prototype.getOAuthToken_ = function(loginOpts) {
+  if (loginOpts.interactive) {
+    return this.getOAuthTokenInteractive_(loginOpts);
+  }
+
+  // For non-interactive logins, attempt to re-use the last accessToken if it
+  // is still valid.  If not default to interactive login behavior.
+  return this.storage.get('FacebookSocialProvider-last-access-token').then(
+      function(lastAccessToken) {
+    return this.isValidToken_(lastAccessToken).then(function(isValid) {
+      if (isValid) {
+        return lastAccessToken;
+      } else {
+        return this.getOAuthTokenInteractive_(loginOpts);
+      }
+    }.bind(this));
+  }.bind(this));
+};
+
+/*
+ * Launches an interactive Facebook OAuth login.
+ * Returns a Promise which fulfills with an OAuth token.
+ */
+FacebookSocialProvider.prototype.getOAuthTokenInteractive_ =
+    function(loginOpts) {
   var OAUTH_REDIRECT_URLS = [
-    "https://fmdppkkepalnkeommjadgbhiohihdhii.chromiumapp.org/",
     "https://www.uproxy.org/oauth-redirect-uri",
+    "https://fmdppkkepalnkeommjadgbhiohihdhii.chromiumapp.org/",
     "http://freedomjs.org/",
     'http://localhost:8080/'
   ];
@@ -31,11 +51,15 @@ FacebookSocialProvider.prototype.getOAuthToken_ = function() {
                 "&redirect_uri=" + encodeURIComponent(stateObj.redirect) +
                 "&state=" + encodeURIComponent(stateObj.state) +
                 "&response_type=token";
-    return oauth.launchAuthFlow(url, stateObj);
+    return oauth.launchAuthFlow(url, stateObj, loginOpts.interactive);
   }).then(function(responseUrl) {
-    return responseUrl.match(/access_token=([^&]+)/)[1];
-  }).catch(function (err) {
-    return Promise.reject('Login error: ' + err.message);
+    var accessToken = responseUrl.match(/access_token=([^&]+)/)[1];
+    if (loginOpts.rememberLogin) {
+      this.storage.set('FacebookSocialProvider-last-access-token', accessToken);
+    }
+    return accessToken;
+  }.bind(this)).catch(function (err) {
+    return Promise.reject('Login error: ' + err);
   });
 };
 
@@ -108,6 +132,30 @@ FacebookSocialProvider.prototype.facebookGet_ = function(endPoint) {
     // TODO: error checking
     xhr.onload = function() {
       fulfill(JSON.parse(this.response));
+    };
+    xhr.send();
+  });
+};
+
+/*
+ * Returns a Promise<boolean> that fulfills with true iff token is still valid.
+ */
+FacebookSocialProvider.prototype.isValidToken_ = function(token) {
+  return new Promise(function(fulfill, reject) {
+    if (!token) {
+      fulfill(false);
+      return;
+    }
+    var xhr = new XMLHttpRequest();
+    var url = 'https://graph.facebook.com/v2.1/me?access_token=' + token +
+        '&format=json&redirect=false';
+    xhr.open('GET', url);
+    xhr.onload = function() {
+      if (JSON.parse(this.response).error) {
+        fulfill(false);
+      } else {
+        fulfill(true);
+      }
     };
     xhr.send();
   });
