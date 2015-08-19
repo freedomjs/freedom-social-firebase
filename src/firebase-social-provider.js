@@ -7,7 +7,7 @@ Firebase.INTERNAL.forceWebSockets();
  * - set .name property to be the name of the social network, as recognized
  *   by Firebase (e.g. "facebook", not "Facebook").
  * - a getOAuthToken_ method which returns a Promise that fulfills with
- *   an authentication token for the given network.
+ *   an OAuth token for that network
  * - a loadContacts_ method, which should load user profiles and invoke
  *   .addUserProfile_ and .updateUserProfile_ as needed.
  * - a .getMyUserProfile_ method, which returns the logged in user's profile.

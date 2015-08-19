@@ -41,7 +41,7 @@ FacebookSocialProvider.prototype.getOAuthTokenInteractive_ =
     'http://localhost:8080/'
   ];
   var OAUTH_CLIENT_ID = '161927677344933';
-  var OAUTH_SCOPE = 'user_friends';
+  var OAUTH_SCOPE = 'user_about_me';
 
   var oauth = freedom["core.oauth"]();
   return oauth.initiateOAuth(OAUTH_REDIRECT_URLS).then(function(stateObj) {
