@@ -6,22 +6,6 @@ FacebookSocialProvider = function(dispatchEvent) {
 };
 FacebookSocialProvider.prototype = new FirebaseSocialProvider();
 
-FacebookSocialProvider.prototype.authenticate_ = function(firebaseRef, loginOpts) {
-  return this.oauth_(firebaseRef, loginOpts).then(function(authData) {
-    this.name = authData.facebook.displayName;  // TODO: test this
-
-    // TODO: using this.allUsersUrl_ from parent class is hacky...
-    var profileUrl = this.allUsersUrl_ + '/' + authData.uid + '/profile';
-    console.log('profileUrl ' + profileUrl);
-    var profileRef = new Firebase(profileUrl);
-    // Note this is the name that appears in the UserProfile, it may contain
-    // spaces, etc.
-    profileRef.update({name: this.name});
-
-    return authData;
-  }.bind(this));
-};
-
 /*
  * Returns a Promise which fulfills with an OAuth token.
  */

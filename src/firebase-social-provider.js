@@ -6,8 +6,8 @@ Firebase.INTERNAL.forceWebSockets();
  * from FirebaseSocialProvider must implement following:
  * - set .name property to be the name of the social network, as recognized
  *   by Firebase (e.g. "facebook", not "Facebook").
- * - an authenticate method which returns a Promise that fulfills with
- *   a Firebase authData object.
+ * - a getOAuthToken_ method which returns a Promise that fulfills with
+ *   an authentication token for the given network.
  * - a loadContacts_ method, which should load user profiles and invoke
  *   .addUserProfile_ and .updateUserProfile_ as needed.
  * - a .getMyUserProfile_ method, which returns the logged in user's profile.
@@ -369,27 +369,6 @@ FirebaseSocialProvider.prototype.setupDetectDisconnect_ = function() {
   }.bind(this));
 };
 
-// Default authenticate, used by Facebook and Google.  May be overriden
-// for networks which don't use getOAuthToken, e.g. email.
-// TODO: this is a mess!!!!!
-FirebaseSocialProvider.prototype.oauth_ = function(firebaseRef, loginOpts) {
-  if (this.loginState_) {
-    throw 'Already signed in';
-  }
-  return new Promise(function(fulfillOAuth, rejectOAuth) {
-    this.getOAuthToken_(loginOpts).then(function(token) {
-      firebaseRef.authWithOAuthToken(this.networkName_, token,
-          function(error, authData) {
-        if (error) {
-          return rejectOAuth(new Error('OAuth failed ' + error));
-        } else {
-          return fulfillOAuth(authData);
-        }
-      }.bind(this));
-    }.bind(this));
-  }.bind(this));
-};
-
 
 /*
  * Loads contacts of the logged in user, and calls this.addUserProfile_
@@ -511,4 +490,34 @@ FirebaseSocialProvider.prototype.getInviteToken = function() {
   var jsonString = JSON.stringify(
     {userId: this.getUserId_(), token: permissionToken, name: this.name});
   return Promise.resolve(btoa(jsonString));
+};
+
+
+FirebaseSocialProvider.prototype.authenticate_ = function(firebaseRef, loginOpts) {
+  return new Promise(function(fulfill, reject) {
+    this.getOAuthToken_(loginOpts).then(function(token) {
+      firebaseRef.authWithOAuthToken(this.networkName_, token,
+          function(error, authData) {
+        if (error || !authData) {
+          return reject(new Error('OAuth failed ' + error));
+        }
+
+        // email may not be available for some providers, e.g. facebook
+        this.email = authData[this.networkName_].email;
+        // displayName may not be set for Google users without a G+ profile
+        // in this case email should still be available.
+        this.name = authData[this.networkName_].displayName || this.email;
+        if (!this.name) {
+          return reject(new Error('Could not get name from social network'));
+        }
+
+        // Set logged in users profile.
+        var profileRef =
+            new Firebase(this.allUsersUrl_ + '/' + authData.uid + '/profile');
+        profileRef.update({name: this.name});
+
+        fulfill(authData);
+      }.bind(this));
+    }.bind(this));
+  }.bind(this));
 };

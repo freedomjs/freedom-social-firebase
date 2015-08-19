@@ -6,27 +6,6 @@ GoogleSocialProvider = function(dispatchEvent) {
 };
 GoogleSocialProvider.prototype = new FirebaseSocialProvider();
 
-GoogleSocialProvider.prototype.authenticate_ = function(firebaseRef, loginOpts) {
-  return this.oauth_(firebaseRef, loginOpts).then(function(authData) {
-    console.log('authData', authData);
-    // TODO: displayName isn't always available.
-    // TODO: if both displayName and email aren't available we should
-    // probably reject?
-    this.name = authData.google.displayName || authData.google.email;
-    this.email = authData.google.email;
-
-    // TODO: using this.allUsersUrl_ from parent class is hacky...
-    var profileUrl = this.allUsersUrl_ + '/' + authData.uid + '/profile';
-    console.log('profileUrl ' + profileUrl);
-    var profileRef = new Firebase(profileUrl);
-    // Note this is the name that appears in the UserProfile, it may contain
-    // spaces, etc.
-    profileRef.update({name: this.name});
-
-    return authData;
-  }.bind(this));
-};
-
 /*
  * Returns a Promise which fulfills with an OAuth token.
  */
