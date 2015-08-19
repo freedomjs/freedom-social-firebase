@@ -66,19 +66,12 @@ FacebookSocialProvider.prototype.getOAuthTokenInteractive_ =
 /*
  * Returns UserProfile object for the logged in user.
  */
-FacebookSocialProvider.prototype.getMyUserProfile_ = function() {
+FacebookSocialProvider.prototype.getMyImage_ = function() {
   if (!this.loginState_) {
     throw 'Error in FacebookSocialProvider.getMyUserProfile_: not logged in';
   }
-  var cachedUserProfile =
-      this.loginState_.authData[this.networkName_].cachedUserProfile;
-  return {
-    userId: this.getUserId_(),
-    name: cachedUserProfile.name,
-    lastUpdated: Date.now(),
-    url: cachedUserProfile.link,
-    imageData: cachedUserProfile.picture.data.url
-  };
+  return this.loginState_.authData[this.networkName_].cachedUserProfile
+      .picture.data.url;
 };
 
 /*

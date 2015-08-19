@@ -43,19 +43,12 @@ GoogleSocialProvider.prototype.getOAuthToken_ = function(loginOpts) {
 /*
  * Returns UserProfile object for the logged in user.
  */
-GoogleSocialProvider.prototype.getMyUserProfile_ = function() {
+GoogleSocialProvider.prototype.getMyImage_ = function() {
   if (!this.loginState_) {
-    throw 'Error in GoogleSocialProvider.getMyUserProfile_: not logged in';
+    throw 'Error in FacebookSocialProvider.getMyUserProfile_: not logged in';
   }
-  var cachedUserProfile =
-      this.loginState_.authData[this.networkName_].cachedUserProfile;
-  return {
-    userId: this.getUserId_(),
-    name: cachedUserProfile.name,
-    lastUpdated: Date.now(),
-    url: cachedUserProfile.link,
-    imageData: cachedUserProfile.picture + '?sz=50'
-  };
+  return this.loginState_.authData[this.networkName_].cachedUserProfile
+      .picture + '?sz=50';
 };
 
 /*
@@ -117,6 +110,7 @@ GoogleSocialProvider.prototype.sendEmail = function(friendEmail, subject, body) 
       'subject: ' + subject + '\n\n' + body;
   this.googlePost_('gmail/v1/users/me/messages/send',
       JSON.stringify({raw: btoa(email)}));
+  return Promise.resolve();
 };
 
 

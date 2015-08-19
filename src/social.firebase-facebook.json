@@ -55,20 +55,20 @@
         }
       },
 
-      "getInviteToken": {
+      "inviteUser": {
         "type": "method",
-        "value": [],
-        "ret": "string"
+        "value": ["string"],
+        "ret": "object"
+      },
+
+      "acceptUserInvitation": {
+       "type": "method",
+        "value": ["string"]
       },
 
       "sendEmail": {
         "type": "method",
         "value": ["string", "string", "string"]
-      },
-
-      "addContact": {
-        "type": "method",
-        "value": ["string"]
       },
 
       "clearCachedCredentials": {"type": "method", "value": []},

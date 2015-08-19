@@ -9,7 +9,7 @@ Firebase.INTERNAL.forceWebSockets();
  * - a getOAuthToken_ method which returns a Promise that fulfills with
  *   an OAuth token for that network
  * - a loadContacts_ method, which should load user profiles and invoke
- *   .addUserProfile_ and .updateUserProfile_ as needed.
+ *   .addUserProfile_ for each contact.
  * - a .getMyUserProfile_ method, which returns the logged in user's profile.
  */
 var FirebaseSocialProvider = function() {
@@ -51,13 +51,6 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
 
   return new Promise(function(fulfillLogin, rejectLogin) {
     this.authenticate_(allUsersRef, loginOpts).then(function(authData) {
-      this.loginState_ = {
-        authData: authData,
-        userProfiles: {},  // map from userId to userProfile
-        clientStates: {},  // map from clientId to clientState
-        agent: loginOpts.agent  // Agent string.  Does not include userId.
-      };
-
       this.setPresence_(true);
       this.setupDetectDisconnect_();
 
@@ -279,25 +272,6 @@ FirebaseSocialProvider.prototype.addOrUpdateMyClient_ = function(status) {
 };
 
 /*
- * Updates an existing UserProfile.
- */
-FirebaseSocialProvider.prototype.updateUserProfile_ = function(newUserProfile) {
-  if (!newUserProfile.userId) {
-    this.logger.error('id missing in updateUserProfile_', newUserProfile);
-    return;
-  } else if (!this.loginState_.userProfiles[newUserProfile.userId]) {
-    this.logger.error('User profile not found for ' + newUserProfile.userId);
-    return;
-  }
-  var profile = this.loginState_.userProfiles[newUserProfile.userId];
-  profile.name = newUserProfile.name || profile.name;
-  profile.url = newUserProfile.url || profile.url;
-  profile.imageData = newUserProfile.imageData || profile.imageData;
-  profile.lastUpdated = Date.now();
-  this.dispatchEvent_('onUserProfile', profile);
-};
-
-/*
  * Sets the ONLINE/OFFLINE presence for the logged in client.
  */
 FirebaseSocialProvider.prototype.setPresence_ = function(isOnline) {
@@ -371,8 +345,7 @@ FirebaseSocialProvider.prototype.setupDetectDisconnect_ = function() {
 
 /*
  * Loads contacts of the logged in user, and calls this.addUserProfile_
- * and this.updateUserProfile_ (if needed later, e.g. for async image
- * fetching) for each contact.
+ * and for each contact.
  */
 FirebaseSocialProvider.prototype.loadContacts_ = function() {
   var networkPrefix = this.networkName_ + ':';
@@ -395,13 +368,24 @@ FirebaseSocialProvider.prototype.loadContacts_ = function() {
         return;
       }
       console.log('adding pre-existing profile, ' + friendId + ', ' + snapshot.val().name);
-      this.addUserProfile_({userId: friendId, name: snapshot.val().name});
+      this.addUserProfile_({
+          userId: friendId,
+          name: snapshot.val().name,
+          imageData: snapshot.val().imageData
+      });
     }.bind(this), function(error) {
-      // TODO: if the friend didn't actually add us (accept our friendRequest)
-      // this will fail to read due to permissions..  Not actually an error
-      console.log('error is !!!! ', error);
+      // This may occur if A invites B, then B accepts the invite while A is
+      // offline - in that case A will not have added a friend directory for
+      // B yet, so B won't be able to read A's profile.
+      // This will mean that B won't have A's image until B signs on again
+      // (they will have the name as it's part of the invite token)
+      // TODO: fix this.
+      console.warn('Error reading friend profile', error);
     }.bind(this));
   }.bind(this));
+
+  // TODO: is it possible for users to add themselves to the /friends directory
+  // if they have a permission token?  then this profile chaos doesn't occur.....
 
   // Monitor friend requests.
   // TODO: these should all be permissioned already, but should we double check?
@@ -426,7 +410,7 @@ FirebaseSocialProvider.prototype.loadContacts_ = function() {
 };
 
 
-FirebaseSocialProvider.prototype.addContact = function(encodedToken) {
+FirebaseSocialProvider.prototype.acceptUserInvitation = function(encodedToken) {
   return new Promise(function(F, R) {
     // TODO: try/catch
     var data = JSON.parse(atob(encodedToken));
@@ -472,9 +456,9 @@ FirebaseSocialProvider.prototype.addContact = function(encodedToken) {
 };
 
 
-FirebaseSocialProvider.prototype.getInviteToken = function() {
+FirebaseSocialProvider.prototype.inviteUser = function(ignoredStringParam) {
   if (!this.loginState_) {
-    throw 'Error in FirebaseSocialProvider.getUserId_: not logged in';
+    throw 'Error in FirebaseSocialProvider.inviteUser: not logged in';
   }
   // TODO: clarify name, is it token, code, secret, etc?
   var uid = this.loginState_.authData.uid;
@@ -488,7 +472,7 @@ FirebaseSocialProvider.prototype.getInviteToken = function() {
   // TODO: make userId and name consistent!!
   var jsonString = JSON.stringify(
     {userId: this.getUserId_(), token: permissionToken, name: this.name});
-  return Promise.resolve(btoa(jsonString));
+  return Promise.resolve({token: btoa(jsonString)});
 };
 
 
@@ -500,6 +484,15 @@ FirebaseSocialProvider.prototype.authenticate_ = function(firebaseRef, loginOpts
         if (error || !authData) {
           return reject(new Error('OAuth failed ' + error));
         }
+
+        this.loginState_ = {
+          authData: authData,
+          userProfiles: {},  // map from userId to userProfile
+          clientStates: {},  // map from clientId to clientState
+          agent: loginOpts.agent  // Agent string.  Does not include userId.
+        };
+
+        // TODO: should these be part of loginState?  or get methods?
 
         // email may not be available for some providers, e.g. facebook
         this.email = authData[this.networkName_].email;
@@ -513,10 +506,28 @@ FirebaseSocialProvider.prototype.authenticate_ = function(firebaseRef, loginOpts
         // Set logged in users profile.
         var profileRef =
             new Firebase(this.allUsersUrl_ + '/' + authData.uid + '/profile');
-        profileRef.update({name: this.name});
+        profileRef.update({name: this.name, imageData: this.getMyImage_()});
 
         fulfill(authData);
       }.bind(this));
     }.bind(this));
   }.bind(this));
+};
+
+/*
+ * Returns UserProfile object for the logged in user.
+ */
+FirebaseSocialProvider.prototype.getMyUserProfile_ = function() {
+  if (!this.loginState_) {
+    throw 'Error in FacebookSocialProvider.getMyUserProfile_: not logged in';
+  }
+  var cachedUserProfile =
+      this.loginState_.authData[this.networkName_].cachedUserProfile;
+  return {
+    userId: this.getUserId_(),
+    name: cachedUserProfile.name,
+    lastUpdated: Date.now(),
+    url: cachedUserProfile.link,
+    imageData: this.getMyImage_()
+  };
 };
