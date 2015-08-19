@@ -6,8 +6,8 @@ GoogleSocialProvider = function(dispatchEvent) {
 };
 GoogleSocialProvider.prototype = new FirebaseSocialProvider();
 
-GoogleSocialProvider.prototype.authenticate_ = function(firebaseRef) {
-  return this.oauth_(firebaseRef).then(function(authData) {
+GoogleSocialProvider.prototype.authenticate_ = function(firebaseRef, loginOpts) {
+  return this.oauth_(firebaseRef, loginOpts).then(function(authData) {
     console.log('authData', authData);
     // TODO: displayName isn't always available.
     // TODO: if both displayName and email aren't available we should
@@ -30,7 +30,7 @@ GoogleSocialProvider.prototype.authenticate_ = function(firebaseRef) {
 /*
  * Returns a Promise which fulfills with an OAuth token.
  */
-GoogleSocialProvider.prototype.getOAuthToken_ = function() {
+GoogleSocialProvider.prototype.getOAuthToken_ = function(loginOpts) {
   var OAUTH_REDIRECT_URLS = [
     "https://fmdppkkepalnkeommjadgbhiohihdhii.chromiumapp.org/",
     "https://www.uproxy.org/oauth-redirect-uri",
@@ -80,7 +80,10 @@ GoogleSocialProvider.prototype.loadContacts_ = function() {
     var friendProfileRef = new Firebase(
       this.allUsersUrl_ + '/google:' + friendId + '/profile/');
     friendProfileRef.once('value', function(snapshot) {
-      if (this.loginState_.userProfiles[friendId]) {
+      if (!snapshot.exists()) {
+        console.error('Profile not found for friend ' + friendId);
+        return;
+      } else if (this.loginState_.userProfiles[friendId]) {
         // TODO: kinda hacky.. This ignores newly added profiles as a result of
         // processing friendRequests
         return;
@@ -184,20 +187,19 @@ GoogleSocialProvider.prototype.googlePost_ = function(endPoint, data) {
   });
 };
 
-GoogleSocialProvider.prototype.sendInviteEmail = function(friendEmail, token) {
+GoogleSocialProvider.prototype.sendEmail = function(friendEmail, subject, body) {
   var email ='"Content-Type: text/plain; charset="us-ascii"\n' +
       'MIME-Version: 1.0\n' +
       'Content-Transfer-Encoding: 7bit\n' +
       'to: ' + friendEmail + '\n' +
-      'from: ' + this.email + '\n' +  // TODO: need to get the users email!!!
-      'subject: Join me on uProxy\n\n' +
-      'Click here to join me on uProxy ' + token;
+      'from: ' + this.email + '\n' +
+      'subject: ' + subject + '\n\n' + body;
   this.googlePost_('gmail/v1/users/me/messages/send',
       JSON.stringify({raw: btoa(email)}));
 };
 
 // TODO: same as Email (just changed simplelogin: to google:)
-GoogleSocialProvider.prototype.sendIntroductionToken = function(friendEmail) {
+GoogleSocialProvider.prototype.getInviteToken = function() {
   if (!this.loginState_) {
     throw 'Error in FirebaseSocialProvider.getUserId_: not logged in';
   }
@@ -214,8 +216,6 @@ GoogleSocialProvider.prototype.sendIntroductionToken = function(friendEmail) {
   // TODO: make userId and name consistent!!
   var jsonString = JSON.stringify(
     {userId: this.getUserId_(), token: permissionToken, name: this.name});
-  // TODO: this formatting duplciates work done in uProxy!!!
-  this.sendInviteEmail(friendEmail, 'https://www.uproxy.org/invite/Google+/' + btoa(jsonString));
   return Promise.resolve(btoa(jsonString));
 };
 

@@ -55,10 +55,15 @@
         }
       },
 
-      "sendIntroductionToken": {
+      "getInviteToken": {
         "type": "method",
-        "value": ["string"],
+        "value": [],
         "ret": "string"
+      },
+
+      "sendEmail": {
+        "type": "method",
+        "value": ["string", "string", "string"]
       },
 
       "addContact": {

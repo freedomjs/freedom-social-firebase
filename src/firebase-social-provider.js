@@ -15,6 +15,8 @@ Firebase.INTERNAL.forceWebSockets();
 var FirebaseSocialProvider = function() {
   // Array of {ref :FirebaseRef, eventType :string, callback :Function} objects.
   this.onCallbacks_ = [];
+
+  this.storage = freedom['core.storage']();
 };
 
 /*
@@ -35,18 +37,6 @@ FirebaseSocialProvider.prototype.initLogger_ = function(moduleName) {
  * loginOpts must contain an agent and url (url of the Firebase app).
  */
 FirebaseSocialProvider.prototype.login = function(loginOpts) {
-  // TODO: remove this terrible version JSON hack
-  console.log('login called with version ' + loginOpts.version);
-  var userId;
-  var password;
-  try {
-    var versionObj = JSON.parse(loginOpts.version);
-    userId = versionObj.userId;
-    password = versionObj.password;
-  } catch(e) {
-    console.log('failed to parse version object');  // TODO: remove
-  }
-
   if (this.loginState_) {
     return Promise.reject('Already logged in');
   } else if (!loginOpts.agent) {
@@ -60,7 +50,7 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
   var allUsersRef = new Firebase(this.allUsersUrl_);
 
   return new Promise(function(fulfillLogin, rejectLogin) {
-    this.authenticate_(allUsersRef, userId, password).then(function(authData) {
+    this.authenticate_(allUsersRef, loginOpts).then(function(authData) {
       this.loginState_ = {
         authData: authData,
         userProfiles: {},  // map from userId to userProfile
@@ -381,12 +371,13 @@ FirebaseSocialProvider.prototype.setupDetectDisconnect_ = function() {
 
 // Default authenticate, used by Facebook and Google.  May be overriden
 // for networks which don't use getOAuthToken, e.g. email.
-FirebaseSocialProvider.prototype.oauth_ = function(firebaseRef) {
+// TODO: this is a mess!!!!!
+FirebaseSocialProvider.prototype.oauth_ = function(firebaseRef, loginOpts) {
   if (this.loginState_) {
     throw 'Already signed in';
   }
   return new Promise(function(fulfillOAuth, rejectOAuth) {
-    this.getOAuthToken_().then(function(token) {
+    this.getOAuthToken_(loginOpts).then(function(token) {
       firebaseRef.authWithOAuthToken(this.networkName_, token,
           function(error, authData) {
         if (error) {
