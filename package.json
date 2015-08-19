@@ -1,7 +1,7 @@
 {
   "name": "freedom-social-firebase",
   "description": "Firebase Social Provider for freedomjs",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "repository": {
     "type": "git",
     "url": "https://github.com/freedomjs/freedom-social-firebase.git"
@@ -11,9 +11,9 @@
   },
   "homepage": "https://github.com/freedomjs/freedom-social-firebase",
   "devDependencies": {
-    "freedom": "^0.6.21",
-    "freedom-for-chrome": "^0.4.15",
-    "freedom-for-firefox": "^0.6.9",
+    "freedom": "^0.6.26",
+    "freedom-for-chrome": "^0.4.20",
+    "freedom-for-firefox": "^0.6.17",
     "grunt": "^0.4.5",
     "grunt-contrib-clean": "^0.6.0",
     "grunt-contrib-connect": "^0.9.0",
