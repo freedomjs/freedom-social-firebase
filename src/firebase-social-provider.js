@@ -45,8 +45,9 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
     return Promise.reject('loginOpts.url must be set');
   }
 
+  // TODO: assert that loginOpts.url ends with 1 '/'
   this.baseUrl_ = loginOpts.url;
-  this.allUsersUrl_ = loginOpts.url + this.networkName_ + '-users';
+  this.allUsersUrl_ = this.baseUrl_ + 'v2/' + this.networkName_ + '-users';
   var allUsersRef = new Firebase(this.allUsersUrl_);
 
   return new Promise(function(fulfillLogin, rejectLogin) {
@@ -156,6 +157,14 @@ FirebaseSocialProvider.prototype.initState_ = function() {
   this.loginState_ = null;
 };
 
+FirebaseSocialProvider.prototype.addFriendDirectory_ = function(friendUserId) {
+  var myRefForFriend = new Firebase(
+      this.allUsersUrl_ + '/' + this.networkName_ + ':' + this.getUserId_() +
+      '/friends/' + this.networkName_ + ':' + friendUserId);
+  // use update, not set, to preserve existing data
+  myRefForFriend.update({isFriend: true});
+};
+
 /*
  * Adds a UserProfile.
  */
@@ -168,16 +177,12 @@ FirebaseSocialProvider.prototype.addUserProfile_ = function(friend) {
   // Ensure that a permanent friend object exists, with the users name.
   // This must be present in order for other friends to properly detect our
   // clients, based on the current Firebase rules configuration.
-  var myRefForFriend = new Firebase(
-      this.allUsersUrl_ + '/' + this.networkName_ + ':' + this.getUserId_() +
-      '/friends/' + this.networkName_ + ':' + friend.userId);
-  // use update, not set, to preserve existing data
-  myRefForFriend.update({isFriend: true});
+  this.addFriendDirectory_(friend.userId);
 
-  // Set an inbox, writable only by my friend, and unique to this
-  // agent (client).  This should be cleared when I disconnect.
-  var myInboxForFriendRef = myRefForFriend.child(
-      'inbox/' + this.loginState_.agent);
+  var myInboxForFriendRef = new Firebase(
+      this.allUsersUrl_ + '/' + this.networkName_ + ':' + this.getUserId_() +
+      '/friends/' + this.networkName_ + ':' + friend.userId +
+      '/inbox/' + this.loginState_.agent);
   myInboxForFriendRef.onDisconnect().remove();
 
   // Monitor my new inbox.  Note that messages may have already been written to
@@ -343,6 +348,26 @@ FirebaseSocialProvider.prototype.setupDetectDisconnect_ = function() {
 };
 
 
+FirebaseSocialProvider.prototype.readFriendProfile_ = function(friendUserId) {
+  return new Promise(function(F, R) {
+    var friendProfileRef = new Firebase(
+        this.allUsersUrl_ + '/' + this.networkName_ + ':' + friendUserId + '/profile/');
+    friendProfileRef.once('value', function(snapshot) {
+      if (!snapshot.exists()) {
+        return R('Profile not found for friend ' + friendUserId);
+      }
+      return F({
+          userId: friendUserId,
+          name: snapshot.val().name,
+          imageData: snapshot.val().imageData
+      });
+    }.bind(this), function(error) {
+      return R(error);
+    }.bind(this));
+  }.bind(this));
+};
+
+
 /*
  * Loads contacts of the logged in user, and calls this.addUserProfile_
  * and for each contact.
@@ -354,57 +379,24 @@ FirebaseSocialProvider.prototype.loadContacts_ = function() {
     this.allUsersUrl_ + '/' + networkPrefix + this.getUserId_() + '/friends/');
   // TODO: is on correct or should it be once?
   this.on_(allFriendsRef, 'child_added', function(snapshot) {
-    var friendId = snapshot.key().substr(networkPrefix.length);
-    console.log('got friendId ' + friendId);
-    var friendProfileRef = new Firebase(
-      this.allUsersUrl_ + '/' + networkPrefix + friendId + '/profile/');
-    friendProfileRef.once('value', function(snapshot) {
-      if (!snapshot.exists()) {
-        console.error('Profile not found for friend ' + friendId);
-        return;
-      } else if (this.loginState_.userProfiles[friendId]) {
-        // TODO: kinda hacky.. This ignores newly added profiles as a result of
-        // processing friendRequests
-        return;
-      }
-      console.log('adding pre-existing profile, ' + friendId + ', ' + snapshot.val().name);
-      this.addUserProfile_({
-          userId: friendId,
-          name: snapshot.val().name,
-          imageData: snapshot.val().imageData
-      });
-    }.bind(this), function(error) {
-      // This may occur if A invites B, then B accepts the invite while A is
-      // offline - in that case A will not have added a friend directory for
-      // B yet, so B won't be able to read A's profile.
-      // This will mean that B won't have A's image until B signs on again
-      // (they will have the name as it's part of the invite token)
-      // TODO: fix this.
-      console.warn('Error reading friend profile', error);
-    }.bind(this));
-  }.bind(this));
-
-  // TODO: is it possible for users to add themselves to the /friends directory
-  // if they have a permission token?  then this profile chaos doesn't occur.....
-
-  // Monitor friend requests.
-  // TODO: these should all be permissioned already, but should we double check?
-  var friendRequestsRef = new Firebase(
-    this.allUsersUrl_ + '/' + networkPrefix + this.getUserId_() + '/friendRequestsWithToken/');
-  // TODO: is on correct or should it be once?
-  this.on_(friendRequestsRef, 'child_added', function(snapshot) {
-
-    console.log('got friendRequest ' + snapshot.key() + ', ', snapshot.val());
-    console.log('... ' + snapshot.child(snapshot.key()).val());
-    snapshot.forEach(function(childSnapshot) {
-      var val = childSnapshot.val();
-      var friendId = val.userId;
-      if (this.loginState_.userProfiles[friendId]) {
-        // Sanity check that friend doesn't already exist.
-        return;
-      }
-      this.addUserProfile_({userId: friendId, name: val.name});
-      // TODO: delete snapshot!
+    var friendUserId = snapshot.key().substr(networkPrefix.length);
+    this.readFriendProfile_(friendUserId).then(function(profile) {
+      this.addUserProfile_(profile);
+    }.bind(this)).catch(function(e) {
+      // There is a race condition where if Alice invites Bob, when Bob accepts
+      // the invite and adds himself to Alice's friend directory, Alice will
+      // detect him in her /friends directory before she is added to Bob's
+      // /friends directory - this results in her being temporarily unable to
+      // read his profile.  Hack around this by waiting 1 second for Bob's
+      // /friends directory to be updated.
+      // TODO: clean up this hack
+      setTimeout(function() {
+        this.readFriendProfile_(friendUserId).then(function(profile) {
+          this.addUserProfile_(profile);
+        }.bind(this)).catch(function(e) {
+          console.error('Error reading profile for user ' + friendUserId);
+        }.bind(this));
+      }.bind(this), 1000);
     }.bind(this));
   }.bind(this));
 };
@@ -420,7 +412,7 @@ FirebaseSocialProvider.prototype.acceptUserInvitation = function(encodedToken) {
     var myUserId = this.getUserId_();
     var myName = this.name;
     var friendUserId = data.userId;
-    var friendName = data.name;
+    var friendName = data.name;  // TODO: remove name
     var token = data.token;
 
     // Sanity check
@@ -440,16 +432,19 @@ FirebaseSocialProvider.prototype.acceptUserInvitation = function(encodedToken) {
       }
 
       var friendRequestUrl = this.allUsersUrl_ + '/' + networkPrefix +
-          friendUserId + '/friendRequestsWithToken/' + token;
+          friendUserId + '/friends/' + networkPrefix + myUserId + '/inviteResponses/' + token;
       console.log('friendRequestUrl: ' + friendRequestUrl);
       var friendRequestRef = new Firebase(friendRequestUrl);
-      friendRequestRef.push({userId: myUserId, name: myName}, function(error) {
+      friendRequestRef.update({isFriend: true}, function(error) {
         console.log('push to friendRequestRef completed with error ' + error);
         if (error) {
           return R('Not permissioned to add friend');
         }
         F();
-        this.addUserProfile_({userId: friendUserId, name: friendName});
+        // Add a directory for the friend.  This will trigger an update
+        // to the callback in loadContacts_ which will get the friend's
+        // profile, start monitoring them and emit an onUserProfile
+        this.addFriendDirectory_(friendUserId);
       }.bind(this));
     }.bind(this));
   }.bind(this));
