@@ -143,6 +143,7 @@
   "permissions": [
     "core.websocket",
     "core.oauth",
-    "core.storage"
+    "core.storage",
+    "core.xhr"
   ]
 }

@@ -6,7 +6,8 @@
       "firebase-shims.js",
       "firebase.js",
       "firebase-social-provider.js",
-      "google-social-provider.js"
+      "google-social-provider.js",
+      "google-auth.js"
    	]
   },
   "default": "social2",
@@ -143,6 +144,7 @@
   "permissions": [
     "core.websocket",
     "core.oauth",
-    "core.storage"
+    "core.storage",
+    "core.xhr"
   ]
 }

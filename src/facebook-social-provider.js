@@ -74,29 +74,7 @@ FacebookSocialProvider.prototype.getMyImage_ = function() {
       .picture.data.url;
 };
 
-/*
- * Makes get request to Facebook endpoint, and returns a Promise which
- * fulfills with the response object.
- */
-FacebookSocialProvider.prototype.facebookGet_ = function(endPoint) {
-  if (!this.loginState_) {
-    throw 'Not signed in';
-  }
-  var xhr = new XMLHttpRequest();
-  var url = 'https://graph.facebook.com/v2.1/' + endPoint +
-      '?access_token=' + this.loginState_.authData.facebook.accessToken +
-      '&format=json&redirect=false';
-  xhr.open('GET', url);
-  return new Promise(function(fulfill, reject) {
-    // TODO: error checking
-    xhr.onload = function() {
-      fulfill(JSON.parse(this.response));
-    };
-    xhr.send();
-  });
-};
-
-FacebookSocialProvider.prototype.sendEmail = function(friendEmail, subject, body) {
+FacebookSocialProvider.prototype.sendEmail = function(to, subject, body) {
   return Promise.reject('Not implemented');
 };
 

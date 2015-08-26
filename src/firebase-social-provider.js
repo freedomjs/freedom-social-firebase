@@ -43,9 +43,10 @@ FirebaseSocialProvider.prototype.login = function(loginOpts) {
     return Promise.reject('loginOpts.agent must be set');
   } else if (!loginOpts.url) {
     return Promise.reject('loginOpts.url must be set');
+  } else if (loginOpts.url.charAt(loginOpts.url.length - 1) !== '/') {
+    return Promise.reject('loginOpts.url must be a URL ending in /');
   }
 
-  // TODO: assert that loginOpts.url ends with 1 '/'
   this.baseUrl_ = loginOpts.url;
   this.allUsersUrl_ = this.baseUrl_ + 'v2/' + this.networkName_ + '-users';
   var allUsersRef = new Firebase(this.allUsersUrl_);
@@ -351,7 +352,8 @@ FirebaseSocialProvider.prototype.setupDetectDisconnect_ = function() {
 FirebaseSocialProvider.prototype.readFriendProfile_ = function(friendUserId) {
   return new Promise(function(F, R) {
     var friendProfileRef = new Firebase(
-        this.allUsersUrl_ + '/' + this.networkName_ + ':' + friendUserId + '/profile/');
+        this.allUsersUrl_ + '/' + this.networkName_ +
+        ':' + friendUserId + '/profile/');
     friendProfileRef.once('value', function(snapshot) {
       if (!snapshot.exists()) {
         return R('Profile not found for friend ' + friendUserId);
@@ -377,7 +379,6 @@ FirebaseSocialProvider.prototype.loadContacts_ = function() {
 
   var allFriendsRef = new Firebase(
     this.allUsersUrl_ + '/' + networkPrefix + this.getUserId_() + '/friends/');
-  // TODO: is on correct or should it be once?
   this.on_(allFriendsRef, 'child_added', function(snapshot) {
     var friendUserId = snapshot.key().substr(networkPrefix.length);
     this.readFriendProfile_(friendUserId).then(function(profile) {
@@ -389,12 +390,12 @@ FirebaseSocialProvider.prototype.loadContacts_ = function() {
       // /friends directory - this results in her being temporarily unable to
       // read his profile.  Hack around this by waiting 1 second for Bob's
       // /friends directory to be updated.
-      // TODO: clean up this hack
+      // TODO: try to fix this so we don't need to retry
       setTimeout(function() {
         this.readFriendProfile_(friendUserId).then(function(profile) {
           this.addUserProfile_(profile);
         }.bind(this)).catch(function(e) {
-          console.error('Error reading profile for user ' + friendUserId);
+          this.logger.error('Error reading profile for user ' + friendUserId);
         }.bind(this));
       }.bind(this), 1000);
     }.bind(this));
@@ -402,41 +403,39 @@ FirebaseSocialProvider.prototype.loadContacts_ = function() {
 };
 
 
-FirebaseSocialProvider.prototype.acceptUserInvitation = function(encodedToken) {
+FirebaseSocialProvider.prototype.acceptUserInvitation = function(jsonString) {
   return new Promise(function(F, R) {
-    // TODO: try/catch
-    var data = JSON.parse(atob(encodedToken));
-    console.log('data ', data);
+    var data;
+    try {
+      data = JSON.parse(jsonString);
+    } catch (e) {
+      return R('Unable to parse: ' + jsonString);
+    }
 
     // Try to write to friends friendRequest folder
     var myUserId = this.getUserId_();
-    var myName = this.name;
     var friendUserId = data.userId;
-    var friendName = data.name;  // TODO: remove name
-    var token = data.token;
+    var permissionToken = data.permissionToken;
 
     // Sanity check
     if (friendUserId === myUserId) {
-      return R('friendId matches self'); // TODO: better error
+      return R('acceptUserInvitation called for logged in user');
     }
 
     var networkPrefix = this.networkName_ + ':';
-    var receivedInviteTokensRef = new Firebase(
+    var receivedPermissionTokensRef = new Firebase(
         this.allUsersUrl_ + '/' + networkPrefix + myUserId +
-        '/receivedInviteTokens/' + token);
-    receivedInviteTokensRef.set({received: true}, function(error) {
-      console.log('pushed');
+        '/receivedPermissionTokens/' + permissionToken);
+    receivedPermissionTokensRef.set({received: true}, function(error) {
       if (error) {
-        console.error('error writing to receivedInviteTokens');  // should never happen
-        return R('error writing to receivedInviteTokens');
+        return R('error writing to receivedPermissionTokens');
       }
 
       var friendRequestUrl = this.allUsersUrl_ + '/' + networkPrefix +
-          friendUserId + '/friends/' + networkPrefix + myUserId + '/inviteResponses/' + token;
-      console.log('friendRequestUrl: ' + friendRequestUrl);
+          friendUserId + '/friends/' + networkPrefix + myUserId +
+          '/inviteResponses/' + permissionToken;
       var friendRequestRef = new Firebase(friendRequestUrl);
       friendRequestRef.update({isFriend: true}, function(error) {
-        console.log('push to friendRequestRef completed with error ' + error);
         if (error) {
           return R('Not permissioned to add friend');
         }
@@ -455,23 +454,23 @@ FirebaseSocialProvider.prototype.inviteUser = function(ignoredStringParam) {
   if (!this.loginState_) {
     throw 'Error in FirebaseSocialProvider.inviteUser: not logged in';
   }
-  // TODO: clarify name, is it token, code, secret, etc?
-  var uid = this.loginState_.authData.uid;
+
+  // Generate a random permissionToken and write it to Firebase.
   var permissionToken = Math.floor(Math.random() * 100000000000);
-  var tokenUrl = this.allUsersUrl_ + '/' + uid + '/generatedInviteTokens/'+ permissionToken;
-  console.log('tokenUrl ' + tokenUrl);
+  var tokenUrl = this.allUsersUrl_ + '/' + this.loginState_.authData.uid +
+      '/generatedPermissionTokens/' + permissionToken;
   var tokenRef = new Firebase(tokenUrl);
   tokenRef.set({timestamp: Date.now()});
 
-  // TODO: this userId is the numeric ID, not the name!!!
-  // TODO: make userId and name consistent!!
+  // Return a JSON string containing userId and permissionToken.
   var jsonString = JSON.stringify(
-    {userId: this.getUserId_(), token: permissionToken, name: this.name});
-  return Promise.resolve({token: btoa(jsonString)});
+      {userId: this.getUserId_(), permissionToken: permissionToken});
+  return Promise.resolve({networkData: jsonString});
 };
 
 
-FirebaseSocialProvider.prototype.authenticate_ = function(firebaseRef, loginOpts) {
+FirebaseSocialProvider.prototype.authenticate_ =
+    function(firebaseRef, loginOpts) {
   return new Promise(function(fulfill, reject) {
     this.getOAuthToken_(loginOpts).then(function(token) {
       firebaseRef.authWithOAuthToken(this.networkName_, token,
@@ -480,28 +479,27 @@ FirebaseSocialProvider.prototype.authenticate_ = function(firebaseRef, loginOpts
           return reject(new Error('OAuth failed ' + error));
         }
 
+        // email may not be available for some providers, e.g. facebook
+        var email = authData[this.networkName_].email;
+        // displayName may not be set for Google users without a G+ profile
+        // in this case email should still be available.
+        var name = authData[this.networkName_].displayName || email;
+        if (!name) {
+          return reject(new Error('Could not get name from social network'));
+        }
+
         this.loginState_ = {
           authData: authData,
           userProfiles: {},  // map from userId to userProfile
           clientStates: {},  // map from clientId to clientState
-          agent: loginOpts.agent  // Agent string.  Does not include userId.
+          agent: loginOpts.agent,  // Agent string.  Does not include userId.
+          name: name
         };
-
-        // TODO: should these be part of loginState?  or get methods?
-
-        // email may not be available for some providers, e.g. facebook
-        this.email = authData[this.networkName_].email;
-        // displayName may not be set for Google users without a G+ profile
-        // in this case email should still be available.
-        this.name = authData[this.networkName_].displayName || this.email;
-        if (!this.name) {
-          return reject(new Error('Could not get name from social network'));
-        }
 
         // Set logged in users profile.
         var profileRef =
             new Firebase(this.allUsersUrl_ + '/' + authData.uid + '/profile');
-        profileRef.update({name: this.name, imageData: this.getMyImage_()});
+        profileRef.update({name: name, imageData: this.getMyImage_()});
 
         fulfill(authData);
       }.bind(this));
@@ -520,7 +518,7 @@ FirebaseSocialProvider.prototype.getMyUserProfile_ = function() {
       this.loginState_.authData[this.networkName_].cachedUserProfile;
   return {
     userId: this.getUserId_(),
-    name: cachedUserProfile.name,
+    name: this.loginState_.name,
     lastUpdated: Date.now(),
     url: cachedUserProfile.link,
     imageData: this.getMyImage_()
