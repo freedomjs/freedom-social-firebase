@@ -11,14 +11,14 @@ GoogleSocialProvider.prototype = new FirebaseSocialProvider();
  */
 GoogleSocialProvider.prototype.getMyImage_ = function() {
   if (!this.loginState_) {
-    throw 'Error in FacebookSocialProvider.getMyUserProfile_: not logged in';
+    throw 'Error in GoogleSocialProvider.getMyImage_: not logged in';
   }
   return this.loginState_.authData[this.networkName_].cachedUserProfile
       .picture + '?sz=50';
 };
 
 /*
- * Makes get request to Google endpoint, and returns a Promise which
+ * Makes post request to Google endpoint, and returns a Promise which
  * fulfills with the response object.
  */
 GoogleSocialProvider.prototype.googlePost_ = function(endPoint, data) {
@@ -55,9 +55,12 @@ GoogleSocialProvider.prototype.sendEmail = function(to, subject, body) {
       'to: ' + to + '\n' +
       'from: ' + this.loginState_.authData[this.networkName_].email + '\n' +
       'subject: ' + subject + '\n\n' + body;
-  this.googlePost_('gmail/v1/users/me/messages/send',
-      JSON.stringify({raw: btoa(email)}));
-  return Promise.resolve();
+  return this.googlePost_('gmail/v1/users/me/messages/send',
+      JSON.stringify({raw: btoa(email)}))
+      .then(function() {
+        // Return Promise<void> to match sendEmail definition.
+        return Promise.resolve();
+      }.bind(this));
 };
 
 
@@ -69,4 +72,3 @@ if (typeof freedom !== 'undefined') {
     freedom.social().providePromises(GoogleSocialProvider);
   }
 }
-

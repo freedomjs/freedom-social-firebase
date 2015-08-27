@@ -53,8 +53,8 @@
           ".read": "$user_id === auth.uid || root.child('simplelogin-users').child($user_id).child('friends').hasChild(auth.uid)"
         },
         "friendRequestsWithToken": {
-          "$permission_tokenn": {
-            ".write": "root.child('simplelogin-users').child(auth.uid).child('receivedInviteTokens').hasChild($permission_tokenn) && root.child('simplelogin-users').child($user_id).child('generatedInviteTokens').hasChild($permission_tokenn)"
+          "$permission_token": {
+            ".write": "root.child('simplelogin-users').child(auth.uid).child('receivedInviteTokens').hasChild($permission_token) && root.child('simplelogin-users').child($user_id).child('generatedInviteTokens').hasChild($permission_token)"
           }
         },
         "receivedFriendRequests": {
@@ -106,14 +106,14 @@
               },
               "inviteResponses": {
                 /*
-                 * Bob can only write to inviteResponses/$permission_tokenn for himself, if Bob has an entry in receivedPermissionTokens
+                 * Bob can only write to inviteResponses/$permission_token for himself, if Bob has an entry in receivedPermissionTokens
                  * which matches an entry in Alice's generatedPermissionTokens directory (not readable by Bob).
                  * e.g. Bob can only write to /v2/facebook-friends/<Alice_id>/friends/<Bob_id>/inviteResponses/<permission_token>
                  * if there is an entry with the same permission_token at /v2/facebook-friends/<Bob_id>/receivedPermissionTokens/<permission_token>/
                  * and another entry with the same permission_token at /v2/facebook-friends/<Alice_id>/generatedPermissionTokens/<permission_token>/
                  */
-                "$permission_tokenn": {
-                  ".write": "$friend_id === auth.uid && root.child('v2/facebook-users').child(auth.uid).child('receivedPermissionTokens').hasChild($permission_tokenn) && root.child('v2/facebook-users').child($user_id).child('generatedPermissionTokens').hasChild($permission_tokenn)"
+                "$permission_token": {
+                  ".write": "$friend_id === auth.uid && root.child('v2/facebook-users').child(auth.uid).child('receivedPermissionTokens').hasChild($permission_token) && root.child('v2/facebook-users').child($user_id).child('generatedPermissionTokens').hasChild($permission_token)"
                 }
               }
             }
@@ -123,7 +123,7 @@
             ".read": "$user_id === auth.uid || root.child('v2/facebook-users').child($user_id).child('friends').hasChild(auth.uid)"
           },
           "profile": {
-            s// Bob can only read from Alice's /profile/ directory if Bob is listed as a friend under Alice's /friends/ directory.
+            // Bob can only read from Alice's /profile/ directory if Bob is listed as a friend under Alice's /friends/ directory.
             ".read": "root.child('v2/facebook-users').child($user_id).child('friends').hasChild(auth.uid)"
           }
         }
@@ -140,8 +140,8 @@
                 ".write": "$friend_id === auth.uid && root.child('v2/google-users').child($user_id).child('friends').hasChild($friend_id)",
               },
               "inviteResponses": {
-                "$permission_tokenn": {
-                  ".write": "$friend_id === auth.uid && root.child('v2/google-users').child(auth.uid).child('receivedPermissionTokens').hasChild($permission_tokenn) && root.child('v2/google-users').child($user_id).child('generatedPermissionTokens').hasChild($permission_tokenn)"
+                "$permission_token": {
+                  ".write": "$friend_id === auth.uid && root.child('v2/google-users').child(auth.uid).child('receivedPermissionTokens').hasChild($permission_token) && root.child('v2/google-users').child($user_id).child('generatedPermissionTokens').hasChild($permission_token)"
                 }
               }
             }

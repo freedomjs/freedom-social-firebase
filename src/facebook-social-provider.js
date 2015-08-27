@@ -68,7 +68,7 @@ FacebookSocialProvider.prototype.getOAuthTokenInteractive_ =
  */
 FacebookSocialProvider.prototype.getMyImage_ = function() {
   if (!this.loginState_) {
-    throw 'Error in FacebookSocialProvider.getMyUserProfile_: not logged in';
+    throw 'Error in FacebookSocialProvider.getMyImage_: not logged in';
   }
   return this.loginState_.authData[this.networkName_].cachedUserProfile
       .picture.data.url;
