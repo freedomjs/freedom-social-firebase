@@ -464,7 +464,7 @@ FirebaseSocialProvider.prototype.inviteUser = function(ignoredStringParam) {
 
   // Return a JSON string containing userId and permissionToken.
   var jsonString = JSON.stringify(
-      {userId: this.getUserId_(), permissionToken: permissionToken});
+      {v: 1, userId: this.getUserId_(), permissionToken: permissionToken});
   return Promise.resolve({networkData: jsonString});
 };
 
