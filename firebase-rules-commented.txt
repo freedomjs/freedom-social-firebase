@@ -1,0 +1,159 @@
+{
+  "rules": {
+    // This section is for the old, pre-invite Facebook provider.  It can be deleted once that provider is no longer in use.
+    "facebook-users": {
+      "$user_id": {
+        ".read": "$user_id === auth.uid",
+        ".write": "$user_id === auth.uid",
+        "friends": {
+          "$friend_id": {
+            ".read": "$user_id === auth.uid || $friend_id === auth.uid",
+            "inbox": {
+              ".write": "$friend_id === auth.uid && root.child('facebook-users').child($user_id).child('friends').hasChild($friend_id)",
+            }
+          }
+        },
+        "clients": {
+          ".read": "$user_id === auth.uid || root.child('facebook-users').child($user_id).child('friends').hasChild(auth.uid)"
+        }
+      }
+    },
+    // This section is for the old, pre-invite Google+ provider.  It can be deleted once that provider is no longer in use.
+    "google-users": {
+      "$user_id": {
+        ".read": "$user_id === auth.uid",
+        ".write": "$user_id === auth.uid",
+        "friends": {
+          "$friend_id": {
+            ".read": "$user_id === auth.uid || $friend_id === auth.uid",
+            "inbox": {
+              ".write": "$friend_id === auth.uid && root.child('google-users').child($user_id).child('friends').hasChild($friend_id)",
+            }
+          }
+        },
+        "clients": {
+          ".read": "$user_id === auth.uid || root.child('google-users').child($user_id).child('friends').hasChild(auth.uid)"
+        }
+      }
+    },
+    // This section is for the experimental "Firebase Email" social provider and can be ignored (only used for the Firebase email prototype).
+    "simplelogin-users": {
+      "$user_id": {
+        ".read": "$user_id === auth.uid",
+        ".write": "$user_id === auth.uid",
+        "friends": {
+          "$friend_id": {
+            ".read": "$user_id === auth.uid || $friend_id === auth.uid",
+            "inbox": {
+              ".write": "$friend_id === auth.uid && root.child('simplelogin-users').child($user_id).child('friends').hasChild($friend_id)",
+            }
+          }
+        },
+        "clients": {
+          ".read": "$user_id === auth.uid || root.child('simplelogin-users').child($user_id).child('friends').hasChild(auth.uid)"
+        },
+        "friendRequestsWithToken": {
+          "$permission_token": {
+            ".write": "root.child('simplelogin-users').child(auth.uid).child('receivedInviteTokens').hasChild($permission_token) && root.child('simplelogin-users').child($user_id).child('generatedInviteTokens').hasChild($permission_token)"
+          }
+        },
+        "receivedFriendRequests": {
+          "$friend_id": {
+            ".write": "$friend_id === auth.uid"
+          }
+        },
+        "acceptedFriendRequests": {
+          "$friend_id": {
+            ".write": "$friend_id === auth.uid && root.child('simplelogin-users').child($user_id).child('sentFriendRequests').hasChild($friend_id)"
+          }
+        },
+        "profile": {
+          ".read": "root.child('simplelogin-users').child($user_id).child('friends').hasChild(auth.uid)"
+        }
+      }
+    },
+    // This section is also for the experimental "Firebase Email" social provider and can be ignored (only used for the Firebase email prototype).
+    "simplelogin-user-mapping": {
+        ".read": "true",
+        ".write": "true"
+    },
+    // All new rules for invite-based Google and Facebook social providers go here.
+    "v2": {
+      "facebook-users": {
+        "$user_id": {
+          /*
+           * By default, only Alice can read and write to Alice's directory.
+           */
+          ".read": "$user_id === auth.uid",
+          ".write": "$user_id === auth.uid",
+          "friends": {
+            /*
+             * Alice has 1 directory per Facebook friend.
+             */
+            "$friend_id": {
+              /*
+               * For Alice's friend Bob, either Alice or Bob can read Alice's
+               * directory for Bob (directory at /v2/facebook-friends/<Alice_id>/friends/<Bob_id>)
+               */
+              ".read": "$user_id === auth.uid || $friend_id === auth.uid",
+              "inbox": {
+                /*
+                 * Bob can write to Alice's inbox for him only if he is already listed as a friend under Alice.
+                 * e.g. Bob can only write to /v2/facebook-friends/<Alice_id>/friends/<Bob_id>/inbox/
+                 * if /v2/facebook-friends/<Alice_id>/friends/<Bob_id>/ already exists.
+                 */
+                ".write": "$friend_id === auth.uid && root.child('v2/facebook-users').child($user_id).child('friends').hasChild($friend_id)",
+              },
+              "inviteResponses": {
+                /*
+                 * Bob can only write to inviteResponses/$permission_token for himself, if Bob has an entry in receivedPermissionTokens
+                 * which matches an entry in Alice's generatedPermissionTokens directory (not readable by Bob).
+                 * e.g. Bob can only write to /v2/facebook-friends/<Alice_id>/friends/<Bob_id>/inviteResponses/<permission_token>
+                 * if there is an entry with the same permission_token at /v2/facebook-friends/<Bob_id>/receivedPermissionTokens/<permission_token>/
+                 * and another entry with the same permission_token at /v2/facebook-friends/<Alice_id>/generatedPermissionTokens/<permission_token>/
+                 */
+                "$permission_token": {
+                  ".write": "$friend_id === auth.uid && root.child('v2/facebook-users').child(auth.uid).child('receivedPermissionTokens').hasChild($permission_token) && root.child('v2/facebook-users').child($user_id).child('generatedPermissionTokens').hasChild($permission_token)"
+                }
+              }
+            }
+          },
+          "clients": {
+            // Bob can only read from Alice's /clients/ directory if Bob is listed as a friend under Alice's /friends/ directory.
+            ".read": "$user_id === auth.uid || root.child('v2/facebook-users').child($user_id).child('friends').hasChild(auth.uid)"
+          },
+          "profile": {
+            // Bob can only read from Alice's /profile/ directory if Bob is listed as a friend under Alice's /friends/ directory.
+            ".read": "root.child('v2/facebook-users').child($user_id).child('friends').hasChild(auth.uid)"
+          }
+        }
+      },
+      // This section is identical to the /v2/facebook-users/ rules only with "google" used instead of "facebook".  TODO: we should look for a way to combine these rules.
+      "google-users": {
+        "$user_id": {
+          ".read": "$user_id === auth.uid",
+          ".write": "$user_id === auth.uid",
+          "friends": {
+            "$friend_id": {
+              ".read": "$user_id === auth.uid || $friend_id === auth.uid",
+              "inbox": {
+                ".write": "$friend_id === auth.uid && root.child('v2/google-users').child($user_id).child('friends').hasChild($friend_id)",
+              },
+              "inviteResponses": {
+                "$permission_token": {
+                  ".write": "$friend_id === auth.uid && root.child('v2/google-users').child(auth.uid).child('receivedPermissionTokens').hasChild($permission_token) && root.child('v2/google-users').child($user_id).child('generatedPermissionTokens').hasChild($permission_token)"
+                }
+              }
+            }
+          },
+          "clients": {
+            ".read": "$user_id === auth.uid || root.child('v2/google-users').child($user_id).child('friends').hasChild(auth.uid)"
+          },
+          "profile": {
+            ".read": "root.child('v2/google-users').child($user_id).child('friends').hasChild(auth.uid)"
+          }
+        }
+      }
+    }
+  }
+}

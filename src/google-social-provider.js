@@ -7,103 +7,60 @@ GoogleSocialProvider = function(dispatchEvent) {
 GoogleSocialProvider.prototype = new FirebaseSocialProvider();
 
 /*
- * Returns a Promise which fulfills with an OAuth token.
- */
-GoogleSocialProvider.prototype.getOAuthToken_ = function() {
-  var OAUTH_REDIRECT_URLS = [
-    "https://fmdppkkepalnkeommjadgbhiohihdhii.chromiumapp.org/",
-    "https://www.uproxy.org/oauth-redirect-uri",
-    "http://freedomjs.org/",
-    'http://localhost:8080/'
-  ];
-  var OAUTH_CLIENT_ID = '746567772449-jkm5q5hjqtpq5m9htg9kn0os8qphra4d' +
-      '.apps.googleusercontent.com';
-  var OAUTH_SCOPE = 'https://www.googleapis.com/auth/plus.login%20' +
-      'https://www.googleapis.com/auth/plus.me%20' +
-      'https://www.googleapis.com/auth/userinfo.email%20' +
-      'https://www.googleapis.com/auth/userinfo.profile';
-
-  var oauth = freedom["core.oauth"]();
-  return oauth.initiateOAuth(OAUTH_REDIRECT_URLS).then(function(stateObj) {
-    var oauthUrl = "https://accounts.google.com/o/oauth2/auth?" +
-        "client_id=" + OAUTH_CLIENT_ID +
-        "&scope=" + OAUTH_SCOPE +
-        "&redirect_uri=" + encodeURIComponent(stateObj.redirect) +
-        "&state=" + encodeURIComponent(stateObj.state) +
-        "&response_type=token";
-    var url = 'https://accounts.google.com/accountchooser?continue=' +
-        encodeURIComponent(oauthUrl);
-    return oauth.launchAuthFlow(url, stateObj);
-  }).then(function(responseUrl) {
-    return responseUrl.match(/access_token=([^&]+)/)[1];
-  }).catch(function (err) {
-    return Promise.reject('Login error: ' + err.message);
-  });
-};
-
-/*
- * Loads contacts of the logged in user, and calls this.addUserProfile_
- * and this.updateUserProfile_ (if needed later, e.g. for async image
- * fetching) for each contact.
- */
-GoogleSocialProvider.prototype.loadContacts_ = function() {
-  // TODO: should we periodically check for new friends?  Or just force
-  // users to logout then login again to detect new friends?
-  this.googleGet_('plus/v1/people/me/people/visible').then(function(resp) {
-    for (var i = 0; i < resp.items.length; ++i) {
-      var friend = resp.items[i];
-      this.addUserProfile_({
-        userId: friend.id,
-        name: friend.displayName,
-        imageData: friend.image.url,
-        url: friend.url
-      });
-    }
-  }.bind(this)).catch(function(e) {
-    this.logger.error('Error loading Google users', e);
-  }.bind(this));
-};
-
-/*
  * Returns UserProfile object for the logged in user.
  */
-GoogleSocialProvider.prototype.getMyUserProfile_ = function() {
+GoogleSocialProvider.prototype.getMyImage_ = function() {
   if (!this.loginState_) {
-    throw 'Error in GoogleSocialProvider.getMyUserProfile_: not logged in';
+    throw 'Error in GoogleSocialProvider.getMyImage_: not logged in';
   }
-  var cachedUserProfile =
-      this.loginState_.authData[this.networkName_].cachedUserProfile;
-  return {
-    userId: this.getUserId_(),
-    name: cachedUserProfile.name,
-    lastUpdated: Date.now(),
-    url: cachedUserProfile.link,
-    imageData: cachedUserProfile.picture + '?sz=50'
-  };
+  return this.loginState_.authData[this.networkName_].cachedUserProfile
+      .picture + '?sz=50';
 };
 
 /*
- * Makes get request to Google endpoint, and returns a Promise which
+ * Makes post request to Google endpoint, and returns a Promise which
  * fulfills with the response object.
  */
-GoogleSocialProvider.prototype.googleGet_ = function(endPoint) {
+GoogleSocialProvider.prototype.googlePost_ = function(endPoint, data) {
   if (!this.loginState_) {
     throw 'Not signed in';
   }
   var xhr = new XMLHttpRequest();
   var url = 'https://www.googleapis.com/' + endPoint +
-      '?key=AIzaSyA1Q7SiEeUdSJwansl2AUFXLpVdnsXUzYg';
-  xhr.open('GET', url);
+      '?key=AIzaSyA1Q7SiEeUdSJwansl2AUFXLpVdnsXUzYg&alt=json';
+  xhr.open('POST', url);
   xhr.setRequestHeader(
       'Authorization',
       'Bearer ' + this.loginState_.authData.google.accessToken);
+  xhr.setRequestHeader(
+      'Content-Type', 'application/json');
   return new Promise(function(fulfill, reject) {
-    // TODO: error checking
     xhr.onload = function() {
       fulfill(JSON.parse(this.response));
     };
-    xhr.send();
+    xhr.onerror = function(e) {
+      reject('Error posting to Google ' + e);
+    };
+    xhr.send(data);
   });
+};
+
+GoogleSocialProvider.prototype.sendEmail = function(to, subject, body) {
+  if (!this.loginState_) {
+    throw 'Not signed in';
+  }
+  var email ='"Content-Type: text/plain; charset="us-ascii"\n' +
+      'MIME-Version: 1.0\n' +
+      'Content-Transfer-Encoding: 7bit\n' +
+      'to: ' + to + '\n' +
+      'from: ' + this.loginState_.authData[this.networkName_].email + '\n' +
+      'subject: ' + subject + '\n\n' + body;
+  return this.googlePost_('gmail/v1/users/me/messages/send',
+      JSON.stringify({raw: btoa(email)}))
+      .then(function() {
+        // Return Promise<void> to match sendEmail definition.
+        return Promise.resolve();
+      }.bind(this));
 };
 
 
@@ -115,4 +72,3 @@ if (typeof freedom !== 'undefined') {
     freedom.social().providePromises(GoogleSocialProvider);
   }
 }
-
