@@ -49,12 +49,13 @@ GoogleSocialProvider.prototype.sendEmail = function(to, subject, body) {
   if (!this.loginState_) {
     throw 'Not signed in';
   }
-  var email ='"Content-Type: text/plain; charset="us-ascii"\n' +
+  var email ='"Content-Type: text/plain; charset="utf-8"\n' +
       'MIME-Version: 1.0\n' +
-      'Content-Transfer-Encoding: 7bit\n' +
+      'Content-Transfer-Encoding: base64\n' +
       'to: ' + to + '\n' +
       'from: ' + this.loginState_.authData[this.networkName_].email + '\n' +
-      'subject: ' + subject + '\n\n' + body;
+      'subject: =?UTF-8?B?' + btoa(unescape(encodeURIComponent(subject))) +
+      '?=\n\n' + btoa(unescape(encodeURIComponent(body)));
   return this.googlePost_('gmail/v1/users/me/messages/send',
       JSON.stringify({raw: btoa(email)}))
       .then(function() {
