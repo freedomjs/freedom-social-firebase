@@ -49,8 +49,11 @@ GoogleSocialProvider.prototype.sendEmail = function(to, subject, body) {
   if (!this.loginState_) {
     throw 'Not signed in';
   }
+  function strToBase64(str) {
+    return btoa(str).replace(/\//g,'_').replace(/\+/g,'-');
+  }
   function utf8ToBase64(utf8String) {
-    return btoa(unescape(encodeURIComponent(utf8String)));
+    return strToBase64(unescape(encodeURIComponent(utf8String)));
   }
   var email ='"Content-Type: text/plain; charset="utf-8"\n' +
       'MIME-Version: 1.0\n' +
@@ -60,7 +63,7 @@ GoogleSocialProvider.prototype.sendEmail = function(to, subject, body) {
       'subject: =?UTF-8?B?' + utf8ToBase64(subject) + '?=\n\n' +
       utf8ToBase64(body);
   return this.googlePost_('gmail/v1/users/me/messages/send',
-      JSON.stringify({raw: btoa(email)}))
+      JSON.stringify({raw: strToBase64(email)}))
       .then(function() {
         // Return Promise<void> to match sendEmail definition.
         return Promise.resolve();
