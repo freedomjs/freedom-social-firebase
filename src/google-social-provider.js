@@ -55,15 +55,14 @@ GoogleSocialProvider.prototype.sendEmail = function(to, subject, body) {
   function utf8ToBase64(utf8String) {
     return strToBase64(unescape(encodeURIComponent(utf8String)));
   }
-  var email ='"Content-Type: text/plain; charset="utf-8"\n' +
+  var email ='Content-Type: text/html; charset="utf-8"\n' +
       'MIME-Version: 1.0\n' +
-      'Content-Transfer-Encoding: base64\n' +
       'to: ' + to + '\n' +
       'from: ' + this.loginState_.authData[this.networkName_].email + '\n' +
       'subject: =?UTF-8?B?' + utf8ToBase64(subject) + '?=\n\n' +
-      utf8ToBase64(body);
+      body;
   return this.googlePost_('gmail/v1/users/me/messages/send',
-      JSON.stringify({raw: strToBase64(email)}))
+      JSON.stringify({raw: utf8ToBase64(email)}))
       .then(function() {
         // Return Promise<void> to match sendEmail definition.
         return Promise.resolve();
