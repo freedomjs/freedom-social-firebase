@@ -33,8 +33,7 @@ GoogleSocialProvider.prototype.googlePost_ = function(endPoint, data) {
         '?key=AIzaSyA1Q7SiEeUdSJwansl2AUFXLpVdnsXUzYg&alt=json';
     xhr.open('POST', url);
     xhr.setRequestHeader('Authorization', 'Bearer ' + validAccessToken);
-    xhr.setRequestHeader(
-        'Content-Type', 'application/json');
+    xhr.setRequestHeader('Content-Type', 'application/json');
     return new Promise(function(fulfill, reject) {
       xhr.onload = function() {
         fulfill(JSON.parse(this.response));
