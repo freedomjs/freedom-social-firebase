@@ -278,10 +278,6 @@ GoogleSocialProvider.prototype.getAccessTokenFromRefreshToken_ =
 
 // returns Promise<accessToken>
 GoogleSocialProvider.prototype.refreshTokenIfNeeded_ = function(accessToken) {
-  // core.xhr callbacks clobber the xhr object if we use .bind(this), so
-  // instead we should set this to a local variable.
-  var thisSocialProvider = this;
-
   return new Promise(function(fulfill, reject) {
     var xhr = freedom["core.xhr"]();
     var url = 'https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=' +
@@ -292,17 +288,17 @@ GoogleSocialProvider.prototype.refreshTokenIfNeeded_ = function(accessToken) {
         if (status === 200) {
           fulfill(accessToken);
         } else {
-          thisSocialProvider.getCredentialsFromStorage_().then(function(data) {
+          this.getCredentialsFromStorage_().then(function(data) {
             fulfill(data.accessToken);
           }).catch(function(e) {
             reject(e);
           });
         }
-      });
-    });
+      }.bind(this));
+    }.bind(this));
     xhr.setRequestHeader('Authorization', 'Bearer ' + accessToken);
     xhr.send();
-  });
+  }.bind(this));
 };
 
 
