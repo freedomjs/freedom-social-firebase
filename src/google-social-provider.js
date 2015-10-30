@@ -25,24 +25,25 @@ GoogleSocialProvider.prototype.googlePost_ = function(endPoint, data) {
   if (!this.loginState_) {
     throw 'Not signed in';
   }
-  var xhr = new XMLHttpRequest();
-  var url = 'https://www.googleapis.com/' + endPoint +
-      '?key=AIzaSyA1Q7SiEeUdSJwansl2AUFXLpVdnsXUzYg&alt=json';
-  xhr.open('POST', url);
-  xhr.setRequestHeader(
-      'Authorization',
-      'Bearer ' + this.loginState_.authData.google.accessToken);
-  xhr.setRequestHeader(
-      'Content-Type', 'application/json');
-  return new Promise(function(fulfill, reject) {
-    xhr.onload = function() {
-      fulfill(JSON.parse(this.response));
-    };
-    xhr.onerror = function(e) {
-      reject('Error posting to Google ' + e);
-    };
-    xhr.send(data);
-  });
+  return this.refreshTokenIfNeeded_(this.loginState_.authData.google.accessToken)
+  .then(function(validAccessToken) {
+    this.loginState_.authData.google.accessToken = validAccessToken;
+    var xhr = new XMLHttpRequest();
+    var url = 'https://www.googleapis.com/' + endPoint +
+        '?key=AIzaSyA1Q7SiEeUdSJwansl2AUFXLpVdnsXUzYg&alt=json';
+    xhr.open('POST', url);
+    xhr.setRequestHeader('Authorization', 'Bearer ' + validAccessToken);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    return new Promise(function(fulfill, reject) {
+      xhr.onload = function() {
+        fulfill(JSON.parse(this.response));
+      };
+      xhr.onerror = function(e) {
+        reject('Error posting to Google ' + e);
+      };
+      xhr.send(data);
+    });
+  }.bind(this));
 };
 
 GoogleSocialProvider.prototype.sendEmail = function(to, subject, body) {

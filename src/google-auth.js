@@ -275,3 +275,30 @@ GoogleSocialProvider.prototype.getAccessTokenFromRefreshToken_ =
     xhr.send({string: data});
   }.bind(this));
 };
+
+// returns Promise<accessToken>
+GoogleSocialProvider.prototype.refreshTokenIfNeeded_ = function(accessToken) {
+  return new Promise(function(fulfill, reject) {
+    var xhr = freedom["core.xhr"]();
+    var url = 'https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=' +
+        accessToken;
+    xhr.open('GET', url, true);
+    xhr.on("onload", function() {
+      xhr.getStatus().then(function(status) {
+        if (status === 200) {
+          fulfill(accessToken);
+        } else {
+          this.getCredentialsFromStorage_().then(function(data) {
+            fulfill(data.accessToken);
+          }).catch(function(e) {
+            reject(e);
+          });
+        }
+      }.bind(this));
+    }.bind(this));
+    xhr.setRequestHeader('Authorization', 'Bearer ' + accessToken);
+    xhr.send();
+  }.bind(this));
+};
+
+
