@@ -361,6 +361,7 @@ FirebaseSocialProvider.prototype.readFriendProfile_ = function(friendUserId) {
       return F({
           userId: friendUserId,
           name: snapshot.val().name,
+          url: snapshot.val().url,
           imageData: snapshot.val().imageData
       });
     }.bind(this), function(error) {
@@ -499,7 +500,11 @@ FirebaseSocialProvider.prototype.authenticate_ =
         // Set logged in users profile.
         var profileRef =
             new Firebase(this.allUsersUrl_ + '/' + authData.uid + '/profile');
-        profileRef.update({name: name, imageData: this.getMyImage_()});
+        profileRef.update({
+          name: name,
+          imageData: this.getMyImage_(),
+          url: authData[this.networkName_].cachedUserProfile.link || ''
+        });
 
         fulfill(authData);
       }.bind(this));
